@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.vpch.vibepulse.screens.navigation.AppNavigation
 import com.vpch.vibepulse.ui.VibePulseTheme
 
 class MainActivity : ComponentActivity() {
@@ -15,14 +16,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             VibePulseTheme {
-                App()
+                AppNavigation()
             }
         }
     }
 }
 
-@Preview
-@Composable
-fun AppAndroidPreview() {
-    App()
-}
