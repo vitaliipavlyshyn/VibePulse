@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":sharedLogic"))
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.material3)
     implementation(libs.jetbrains.navigation3.ui)
     implementation(libs.jetbrains.material3.adaptiveNavigation3)
     implementation(libs.jetbrains.lifecycle.viewmodelNavigation3)
