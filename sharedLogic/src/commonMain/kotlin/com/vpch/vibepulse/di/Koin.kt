@@ -8,10 +8,10 @@ import org.koin.core.module.Module
 private var koinRef: Koin? = null
 
 fun initKoin(config: (KoinApplication) -> Unit = {}) {
-    if(koinRef == null) {
+    if (koinRef == null) {
         val app = startKoin {
             config(this)
-            modules()
+            modules(networkModule + viewModelModule)
         }
         koinRef = app.koin
     }

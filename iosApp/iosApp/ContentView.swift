@@ -2,42 +2,16 @@ import SwiftUI
 import SharedLogic
 
 struct ContentView: View {
-    @State private var showContent = false
-    
-    var body: some View {
-          
-            VibePulseTheme {
-                AppTheme.colors.background
-                    .ignoresSafeArea()
-                    .overlay(
-                        VStack(spacing: 24) {
-                            Button("Click me!") {
-                                withAnimation {
-                                    showContent = !showContent
-                                }
-                            }
-                            .font(Font.AppTypography.labelLarge)
-                            .foregroundColor(AppTheme.colors.primary)
+    @State private var isAuthenticated = false
 
-                            if showContent {
-                                VStack(spacing: 16) {
-                                    Image(systemName: "swift")
-                                        .font(.system(size: 100))
-                                        .foregroundColor(AppTheme.colors.primary)
-                                        
-                                    Text("SwiftUI: \(Greeting().greet())")
-                                        .font(Font.AppTypography.bodyLarge)
-                                        .foregroundColor(AppTheme.colors.onBackground)
-                                }
-                                .padding()
-                                .background(AppTheme.colors.surface)
-                                .cornerRadius(12)
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                            }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .padding()
-                    )
+        var body: some View {
+            if isAuthenticated {
+                Text("Connected to Spotify!")
+                    .font(.title2)
+            } else {
+                AuthView(onLoginSuccess: {
+                    isAuthenticated = true
+                })
             }
         }
 }

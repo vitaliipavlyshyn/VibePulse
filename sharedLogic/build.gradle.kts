@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -7,6 +8,26 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
     alias(libs.plugins.skie)
+    alias(libs.plugins.buildkonfig)
+}
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(localPropertiesFile.inputStream())
+    }
+}
+
+buildkonfig {
+    packageName = "com.vpch.vibepulse"
+
+    defaultConfigs {
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "SPOTIFY_CLIENT_ID",
+            localProperties.getProperty("SPOTIFY_CLIENT_ID") ?: ""
+        )
+    }
 }
 
 kotlin {
@@ -47,8 +68,10 @@ kotlin {
             implementation(libs.ktor.client.logging)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.koin.core)
+            implementation(libs.koin.compose.viewmodel)
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
+            implementation(libs.androidx.lifecycle.viewmodelCompose)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

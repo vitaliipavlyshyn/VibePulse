@@ -1,4 +1,4 @@
-package com.vpch.vibepulse.domain
+package com.vpch.vibepulse.domain.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

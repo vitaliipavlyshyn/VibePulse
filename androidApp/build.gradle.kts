@@ -21,7 +21,8 @@ dependencies {
     implementation(libs.jetbrains.material3.adaptiveNavigation3)
     implementation(libs.jetbrains.lifecycle.viewmodelNavigation3)
     implementation(libs.koin.core)
-
+    implementation(libs.koin.android)
+    implementation(libs.koin.compose.viewmodel)
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
