@@ -58,6 +58,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.koin.android)
+            implementation(libs.androidx.security.crypto)
         }
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
@@ -72,6 +73,8 @@ kotlin {
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
+            implementation(libs.multiplatform.settings)
+            implementation(libs.ktor.client.auth)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

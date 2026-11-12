@@ -11,7 +11,11 @@ fun initKoin(config: (KoinApplication) -> Unit = {}) {
     if (koinRef == null) {
         val app = startKoin {
             config(this)
-            modules(networkModule + viewModelModule)
+            modules(
+                networkModule,
+                viewModelModule,
+                platformModule()
+            )
         }
         koinRef = app.koin
     }

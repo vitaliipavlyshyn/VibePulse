@@ -2,10 +2,12 @@ package com.vpch.vibepulse.network
 
 import com.vpch.vibepulse.PkceUtil
 import com.vpch.vibepulse.generateCodeChallenge
+import com.vpch.vibepulse.storage.TokenStorage
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.forms.submitForm
 import io.ktor.http.Parameters
+import io.ktor.http.isSuccess
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -18,10 +20,16 @@ data class SpotifyTokenResponse(
     @SerialName("scope") val scope: String,
 )
 
+@Serializable
+data class SpotifyErrorResponse(
+    @SerialName("error") val error: String,
+    @SerialName("error_description") val errorDescription: String? = null
+)
 
 class SpotifyAuthService(
     private val httpClient: HttpClient,
-    private val config: SpotifyConfig
+    private val config: SpotifyConfig,
+    private val tokenStorage: TokenStorage
 ) {
     var currentCodeVerifier: String? = null
         private set
@@ -49,10 +57,11 @@ class SpotifyAuthService(
     }
 
     suspend fun exchangeCodeForToken(code: String): Result<SpotifyTokenResponse> {
-        val verifier = currentCodeVerifier ?: return Result.failure(Exception("Code verifier not found"))
+        val verifier = currentCodeVerifier
+            ?: return Result.failure(IllegalStateException("Code verifier not found"))
 
         return runCatching {
-            httpClient.submitForm(
+            val response = httpClient.submitForm(
                 url = "https://accounts.spotify.com/api/token",
                 formParameters = Parameters.build {
                     append("grant_type", "authorization_code")
@@ -61,7 +70,50 @@ class SpotifyAuthService(
                     append("client_id", config.clientId)
                     append("code_verifier", verifier)
                 }
-            ).body()
+            )
+
+            if (response.status.isSuccess()) {
+                val tokens = response.body<SpotifyTokenResponse>()
+                tokenStorage.saveTokens(
+                    accessToken = tokens.accessToken,
+                    refreshToken = tokens.refreshToken,
+                    expiresInSeconds = tokens.expiresIn
+                )
+                currentCodeVerifier = null
+                tokens
+            } else {
+                val errorResponse = response.body<SpotifyErrorResponse>()
+                throw Exception("Spotify API Error [${errorResponse.error}]: ${errorResponse.errorDescription}")
+            }
+        }
+    }
+
+    suspend fun refreshAccessToken(): Result<SpotifyTokenResponse> {
+        val refreshToken = tokenStorage.getRefreshToken()
+            ?: return Result.failure(IllegalStateException("No refresh token available"))
+
+        return runCatching {
+            val response = httpClient.submitForm(
+                url = "https://accounts.spotify.com/api/token",
+                formParameters = Parameters.build {
+                    append("grant_type", "refresh_token")
+                    append("refresh_token", refreshToken)
+                    append("client_id", config.clientId)
+                }
+            )
+
+            if (response.status.isSuccess()) {
+                val tokens = response.body<SpotifyTokenResponse>()
+                tokenStorage.saveTokens(
+                    accessToken = tokens.accessToken,
+                    refreshToken = tokens.refreshToken,
+                    expiresInSeconds = tokens.expiresIn
+                )
+                tokens
+            } else {
+                tokenStorage.clearTokens()
+                throw Exception("Session expired, please log in again")
+            }
         }
     }
 }

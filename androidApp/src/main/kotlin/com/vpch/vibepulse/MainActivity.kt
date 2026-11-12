@@ -10,12 +10,15 @@ import androidx.activity.enableEdgeToEdge
 import com.vpch.vibepulse.presentation.auth.AuthIntent
 import com.vpch.vibepulse.presentation.auth.AuthViewModel
 import com.vpch.vibepulse.screens.navigation.AppNavigation
+import com.vpch.vibepulse.storage.TokenStorage
 import com.vpch.vibepulse.ui.VibePulseTheme
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class MainActivity : ComponentActivity() {
 
     private val authViewModel: AuthViewModel by viewModel()
+    private val tokenStorage: TokenStorage by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -24,7 +27,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             VibePulseTheme {
-                AppNavigation()
+                AppNavigation(
+                    isUserLogged = tokenStorage.hasSession()
+                )
             }
         }
     }
