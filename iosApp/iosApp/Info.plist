@@ -15,6 +15,8 @@
 			<array>
 				<string>vibepulse</string>
 			</array>
+            <key>NSLocationWhenInUseUsageDescription</key>
+            <string>VibePulse використовує вашу приблизну локацію для визначення поточної погоди та підбору музики під темп пробіжки.</string>
 		</dict>
 	</array>
 </dict>

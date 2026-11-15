@@ -13,6 +13,7 @@ fun initKoin(config: (KoinApplication) -> Unit = {}) {
             config(this)
             modules(
                 networkModule,
+                domainModule,
                 viewModelModule,
                 platformModule()
             )
