@@ -16,8 +16,8 @@ data class SpotifyTokenResponse(
     @SerialName("access_token") val accessToken: String,
     @SerialName("token_type") val tokenType: String,
     @SerialName("expires_in") val expiresIn: Int,
-    @SerialName("refresh_token") val refreshToken: String,
-    @SerialName("scope") val scope: String,
+    @SerialName("refresh_token") val refreshToken: String? = null,
+    @SerialName("scope") val scope: String? = null,
 )
 
 @Serializable
@@ -42,9 +42,11 @@ class SpotifyAuthService(
 
         val scopes = listOf(
             "user-read-private",
-            "user-read-email",
             "user-modify-playback-state",
-            "user-read-playback-state"
+            "user-read-playback-state",
+            "user-library-read",
+            "user-library-modify",
+            "app-remote-control"
         ).joinToString("%20")
 
         return "https://accounts.spotify.com/authorize?" +
@@ -106,7 +108,7 @@ class SpotifyAuthService(
                 val tokens = response.body<SpotifyTokenResponse>()
                 tokenStorage.saveTokens(
                     accessToken = tokens.accessToken,
-                    refreshToken = tokens.refreshToken,
+                    refreshToken = tokens.refreshToken ?: refreshToken,
                     expiresInSeconds = tokens.expiresIn
                 )
                 tokens

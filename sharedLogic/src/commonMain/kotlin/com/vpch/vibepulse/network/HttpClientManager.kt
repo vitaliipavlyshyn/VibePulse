@@ -23,11 +23,13 @@ private fun HttpClientConfig<*>.installBasePlugins() {
             isLenient = true
             coerceInputValues = true
             ignoreUnknownKeys = true
+            explicitNulls = false
         })
     }
     install(Logging) {
         logger = Logger.SIMPLE
         level = LogLevel.ALL
+        sanitizeHeader { header -> header == io.ktor.http.HttpHeaders.Authorization }
     }
 }
 
@@ -36,13 +38,14 @@ fun createHttpClient() = HttpClient {
 }
 
 fun createSpotifyApiClient(
+    baseUrl: String,
     tokenStorage: TokenStorage,
     authService: SpotifyAuthService
 ) = HttpClient {
     installBasePlugins()
 
     defaultRequest {
-        url("https://api.spotify.com/v1/")
+        url(baseUrl)
     }
 
     install(Auth) {
@@ -70,5 +73,15 @@ fun createSpotifyApiClient(
                 request.url.host == "api.spotify.com"
             }
         }
+    }
+}
+
+fun createReccoBeatsApiClient(
+    baseUrl: String
+) = HttpClient {
+    installBasePlugins()
+
+    defaultRequest {
+        url(baseUrl)
     }
 }
