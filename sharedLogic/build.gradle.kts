@@ -1,3 +1,4 @@
+import com.codingfeline.buildkonfig.compiler.FieldSpec
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
@@ -23,9 +24,24 @@ buildkonfig {
 
     defaultConfigs {
         buildConfigField(
-            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            FieldSpec.Type.STRING,
             "SPOTIFY_CLIENT_ID",
             localProperties.getProperty("SPOTIFY_CLIENT_ID") ?: ""
+        )
+        buildConfigField(
+            type = FieldSpec.Type.STRING,
+            name = "OPENWEATHER_API_KEY",
+            value = localProperties.getProperty("OPENWEATHER_API_KEY") ?: ""
+        )
+        buildConfigField(
+            FieldSpec.Type.STRING,
+            "SPOTIFY_BASE_URL",
+            "https://api.spotify.com/v1/"
+        )
+        buildConfigField(
+            FieldSpec.Type.STRING,
+            "RECCOBEATS_BASE_URL",
+            "https://api.reccobeats.com/v1/"
         )
     }
 }
@@ -59,6 +75,9 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.koin.android)
             implementation(libs.androidx.security.crypto)
+            implementation(libs.play.services.location)
+            implementation(":spotify-app-remote-release-0.8.0@aar")
+            implementation(libs.gson)
         }
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)

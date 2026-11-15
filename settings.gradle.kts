@@ -24,6 +24,9 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
+        flatDir {
+            dirs(rootProject.projectDir.resolve("spotify-app-remote"))
+        }
     }
 }
 
