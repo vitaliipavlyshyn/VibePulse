@@ -1,19 +1,25 @@
 package com.vpch.vibepulse.screens.home.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.runtime.State
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +32,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,15 +47,25 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.Morph
+import androidx.graphics.shapes.toPath
 import coil3.compose.AsyncImage
 import com.vpch.vibepulse.R
 import com.vpch.vibepulse.domain.model.Track
@@ -57,6 +74,27 @@ import com.vpch.vibepulse.ui.VibePulseTheme
 import com.vpch.vibepulse.ui.components.VibePulseButton
 import com.vpch.vibepulse.ui.components.text.BodyText
 import com.vpch.vibepulse.ui.components.text.TitleText
+
+private object PlayerDefaults {
+    val CardCornerRadius = 28.dp
+    val ArtworkSize = 188.dp
+    val PausedArtworkCornerRadius = 24.dp
+    val PlaceholderLogoSize = 58.dp
+    val ControlButtonSize = 44.dp
+    val PlayButtonHeight = 48.dp
+    val SeekbarHeight = 26.dp
+    val WaveLength = 24.dp
+    val WaveSpeed = 16.dp
+
+    const val MORPH_STEP_DURATION_MS = 2400
+    const val TILT_DURATION_MS = 3200
+    const val STATE_TRANSITION_MS = 500
+    const val TILT_DEGREES = 3.5f
+    const val ARTWORK_ACTIVE_SCALE = 1.06f
+
+    val DefaultTrackTitleRes = R.string.no_active_track
+    val DefaultTrackArtistRes = R.string.play_music_on_spotify
+}
 
 @Composable
 fun SpotifyPlayerCard(
@@ -72,30 +110,11 @@ fun SpotifyPlayerCard(
     onSeekTo: (Long) -> Unit = {}
 ) {
     val totalDuration = durationMs.takeIf { it > 0L } ?: track?.durationMs ?: 0L
-    val playbackProgress = if (totalDuration > 0L) {
-        (positionMs.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-
-    var isDragging by remember { mutableStateOf(false) }
-    var dragProgress by remember { mutableFloatStateOf(0f) }
-
-    val displayedProgress = if (isDragging) dragProgress else playbackProgress
-    val displayedPositionMs = if (isDragging) {
-        (dragProgress * totalDuration).toLong()
-    } else {
-        positionMs
-    }
-
-    val waveAmplitude by animateFloatAsState(
-        targetValue = if (isPlaying && track != null && !isDragging) 1f else 0f,
-        label = "waveAmplitude"
-    )
+    val isActivelyPlaying = isPlaying && track != null
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(PlayerDefaults.CardCornerRadius),
         color = AppTheme.colors.buttonPrimary,
         border = BorderStroke(
             width = 1.5.dp,
@@ -109,224 +128,426 @@ fun SpotifyPlayerCard(
                 .padding(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(184.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(Color(0xFF101214)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(R.drawable.spotify_logo),
-                        contentDescription = null,
-                        modifier = Modifier.size(58.dp),
-                        tint = Color.White.copy(alpha = 0.25f)
-                    )
-
-                    if (!track?.albumArtUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = track.albumArtUrl,
-                            contentDescription = track.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-
-                if (track != null && track.tempo > 0) {
-                    Surface(
-                        modifier = Modifier.align(Alignment.TopEnd),
-                        shape = CircleShape,
-                        color = AppTheme.colors.buttonSecondary,
-                        border = BorderStroke(1.dp, AppTheme.colors.strokePrimary.copy(alpha = 0.4f))
-                    ) {
-                        BodyText(
-                            text = "${track.tempo} BPM",
-                            color = AppTheme.colors.textPrimary,
-                            style = AppTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            TitleText(
-                text = track?.title ?: "Немає активного треку",
-                color = AppTheme.colors.textPrimary,
-                style = AppTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier
-                    .padding(horizontal = 8.dp)
-                    .basicMarquee(iterations = Int.MAX_VALUE)
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            BodyText(
-                text = track?.artist ?: "Увімкніть музику у Spotify",
-                color = AppTheme.colors.textSecondary,
-                style = AppTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                modifier = Modifier
-                    .padding(horizontal = 8.dp)
-                    .basicMarquee(iterations = Int.MAX_VALUE)
+            TrackArtworkSection(
+                albumArtUrl = track?.albumArtUrl,
+                title = track?.title,
+                tempo = track?.tempo ?: 0,
+                isActivelyPlaying = isActivelyPlaying
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                val canSeek = track != null && totalDuration > 0L
+            TrackInfoSection(
+                title = track?.title,
+                artist = track?.artist
+            )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(26.dp)
-                        .then(
-                            if (canSeek) {
-                                Modifier
-                                    .pointerInput(totalDuration) {
-                                        detectTapGestures { offset ->
-                                            val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                                            onSeekTo((fraction * totalDuration).toLong())
-                                        }
-                                    }
-                                    .pointerInput(totalDuration) {
-                                        detectHorizontalDragGestures(
-                                            onDragStart = { offset ->
-                                                isDragging = true
-                                                dragProgress = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                                            },
-                                            onHorizontalDrag = { change, _ ->
-                                                change.consume()
-                                                dragProgress = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
-                                            },
-                                            onDragEnd = {
-                                                onSeekTo((dragProgress * totalDuration).toLong())
-                                                isDragging = false
-                                            },
-                                            onDragCancel = {
-                                                isDragging = false
-                                            }
-                                        )
-                                    }
-                            } else {
-                                Modifier
-                            }
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LinearWavyProgressIndicator(
-                        progress = { displayedProgress },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = AppTheme.colors.indicator,
-                        trackColor = AppTheme.colors.trackIndicator.copy(alpha = 0.35f),
-                        amplitude = { waveAmplitude },
-                        wavelength = 24.dp,
-                        waveSpeed = 16.dp
-                    )
-                }
+            Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    BodyText(
-                        text = formatTrackTime(displayedPositionMs),
-                        color = if (isDragging) AppTheme.colors.textPrimary else AppTheme.colors.textSecondary,
-                        style = AppTheme.typography.labelSmall,
-                        fontWeight = if (isDragging) FontWeight.Bold else FontWeight.Normal
-                    )
-                    BodyText(
-                        text = formatTrackTime(totalDuration),
-                        color = AppTheme.colors.textSecondary,
-                        style = AppTheme.typography.labelSmall
-                    )
-                }
-            }
+            TrackProgressSection(
+                positionMs = positionMs,
+                totalDurationMs = totalDuration,
+                canSeek = track != null && totalDuration > 0L,
+                isActivelyPlaying = isActivelyPlaying,
+                onSeekTo = onSeekTo
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            PlayerControlsSection(
+                hasTrack = track != null,
+                isPlaying = isPlaying,
+                isLiked = isLiked,
+                onToggleLike = onToggleLike,
+                onTogglePlayPause = onTogglePlayPause,
+                onSkipNext = onSkipNext
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun TrackArtworkSection(
+    albumArtUrl: String?,
+    title: String?,
+    tempo: Int,
+    isActivelyPlaying: Boolean
+) {
+    val expressivePolygons = remember {
+        listOf(
+            MaterialShapes.Square,
+            MaterialShapes.Cookie4Sided,
+            MaterialShapes.Circle,
+            MaterialShapes.Slanted,
+            MaterialShapes.Cookie6Sided
+        )
+    }
+    val morphs = remember(expressivePolygons) {
+        expressivePolygons.indices.map { i ->
+            val next = (i + 1) % expressivePolygons.size
+            Morph(expressivePolygons[i], expressivePolygons[next])
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "artworkMorphTransition")
+    val cycleProgressState = infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = morphs.size.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = morphs.size * PlayerDefaults.MORPH_STEP_DURATION_MS,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "cycleProgress"
+    )
+    val subtleTiltState = infiniteTransition.animateFloat(
+        initialValue = -PlayerDefaults.TILT_DEGREES,
+        targetValue = PlayerDefaults.TILT_DEGREES,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = PlayerDefaults.TILT_DURATION_MS,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "subtleTilt"
+    )
+    val activeStrengthState = animateFloatAsState(
+        targetValue = if (isActivelyPlaying) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = PlayerDefaults.STATE_TRANSITION_MS,
+            easing = FastOutSlowInEasing
+        ),
+        label = "activeStrength"
+    )
+
+    val pausedShape = remember { RoundedCornerShape(PlayerDefaults.PausedArtworkCornerRadius) }
+    val morphShape = remember(morphs) {
+        ExpressiveMorphShape(
+            morphs = morphs,
+            cycleProgressState = cycleProgressState
+        )
+    }
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        MorphingArtworkBox(
+            albumArtUrl = albumArtUrl,
+            title = title,
+            isActivelyPlaying = isActivelyPlaying,
+            activeStrengthState = activeStrengthState,
+            subtleTiltState = subtleTiltState,
+            morphShape = morphShape,
+            pausedShape = pausedShape
+        )
+
+        if (tempo > 0) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopEnd),
+                shape = CircleShape,
+                color = AppTheme.colors.buttonSecondary,
+                border = BorderStroke(1.dp, AppTheme.colors.strokePrimary.copy(alpha = 0.4f))
             ) {
-                FilledTonalIconButton(
-                    onClick = onToggleLike,
-                    enabled = track != null,
-                    modifier = Modifier.size(44.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = if (isLiked) {
-                            AppTheme.colors.buttonFilled.copy(alpha = 0.18f)
-                        } else {
-                            AppTheme.colors.buttonSecondary
-                        },
-                        contentColor = AppTheme.colors.indicator,
-                        disabledContainerColor = AppTheme.colors.buttonSecondary.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Icon(
-                        imageVector = if (isLiked) {
-                            ImageVector.vectorResource(R.drawable.fill_favorite)
-                        } else {
-                            ImageVector.vectorResource(R.drawable.outline_favorite)
-                        },
-                        contentDescription = if (isLiked) "Видалити з улюблених" else "Додати в улюблені",
-                        tint = if (isLiked) {
-                            AppTheme.colors.indicator
-                        } else {
-                            AppTheme.colors.iconSecondary
-                        }
-                    )
-                }
-
-                VibePulseButton(
-                    onClick = onTogglePlayPause,
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
-                    modifier = Modifier.height(48.dp)
-                ) {
-                    PlayPauseGlyph(
-                        isPlaying = isPlaying,
-                        color = AppTheme.colors.iconFilled,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                FilledTonalIconButton(
-                    onClick = onSkipNext,
-                    modifier = Modifier.size(44.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = AppTheme.colors.buttonSecondary,
-                        contentColor = AppTheme.colors.indicator
-                    )
-                ) {
-                    SkipNextGlyph(
-                        color = AppTheme.colors.iconPrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                BodyText(
+                    text = "$tempo BPM",
+                    color = AppTheme.colors.textPrimary,
+                    style = AppTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
             }
         }
     }
 }
+
+@Composable
+private fun MorphingArtworkBox(
+    albumArtUrl: String?,
+    title: String?,
+    isActivelyPlaying: Boolean,
+    activeStrengthState: State<Float>,
+    subtleTiltState: State<Float>,
+    morphShape: Shape,
+    pausedShape: Shape
+) {
+    val activeShape = if (activeStrengthState.value > 0.01f) morphShape else pausedShape
+
+    Box(
+        modifier = Modifier
+            .size(PlayerDefaults.ArtworkSize)
+            .graphicsLayer {
+                rotationZ = if (isActivelyPlaying) subtleTiltState.value else 0f
+            }
+            .clip(activeShape)
+            .background(Color(0xFF101214)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = ImageVector.vectorResource(R.drawable.spotify_logo),
+            contentDescription = null,
+            modifier = Modifier
+                .size(PlayerDefaults.PlaceholderLogoSize)
+                .graphicsLayer {
+                    rotationZ = if (isActivelyPlaying) -subtleTiltState.value else 0f
+                },
+            tint = Color.White.copy(alpha = 0.25f)
+        )
+
+        if (!albumArtUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = albumArtUrl,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val strength = activeStrengthState.value
+                        rotationZ = if (isActivelyPlaying) -subtleTiltState.value else 0f
+                        val scale = 1f + (PlayerDefaults.ARTWORK_ACTIVE_SCALE - 1f) * strength
+                        scaleX = scale
+                        scaleY = scale
+                    }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrackInfoSection(
+    title: String?,
+    artist: String?
+) {
+    TitleText(
+        text = title ?: stringResource(PlayerDefaults.DefaultTrackTitleRes),
+        color = AppTheme.colors.textPrimary,
+        style = AppTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        modifier = Modifier
+            .padding(horizontal = 8.dp)
+            .basicMarquee(iterations = Int.MAX_VALUE)
+    )
+
+    Spacer(modifier = Modifier.height(2.dp))
+
+    BodyText(
+        text = artist ?: stringResource(PlayerDefaults.DefaultTrackArtistRes),
+        color = AppTheme.colors.textSecondary,
+        style = AppTheme.typography.bodyMedium,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        modifier = Modifier
+            .padding(horizontal = 8.dp)
+            .basicMarquee(iterations = Int.MAX_VALUE)
+    )
+}
+
+@Composable
+private fun TrackProgressSection(
+    positionMs: Long,
+    totalDurationMs: Long,
+    canSeek: Boolean,
+    isActivelyPlaying: Boolean,
+    onSeekTo: (Long) -> Unit
+) {
+    val playbackProgress = if (totalDurationMs > 0L) {
+        (positionMs.toFloat() / totalDurationMs.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    var isDragging by remember { mutableStateOf(false) }
+    var dragProgress by remember { mutableFloatStateOf(0f) }
+
+    val displayedProgress = if (isDragging) dragProgress else playbackProgress
+    val displayedPositionMs = if (isDragging) {
+        (dragProgress * totalDurationMs).toLong()
+    } else {
+        positionMs
+    }
+
+    val waveAmplitude by animateFloatAsState(
+        targetValue = if (isActivelyPlaying && !isDragging) 1f else 0f,
+        label = "waveAmplitude"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PlayerDefaults.SeekbarHeight)
+                .then(
+                    if (canSeek) {
+                        Modifier.pointerInput(totalDurationMs) {
+                            fun fractionFromX(x: Float): Float =
+                                (x / size.width.toFloat()).coerceIn(0f, 1f)
+
+                            detectHorizontalDragGestures(
+                                onDragStart = { offset ->
+                                    isDragging = true
+                                    dragProgress = fractionFromX(offset.x)
+                                },
+                                onHorizontalDrag = { change, _ ->
+                                    change.consume()
+                                    dragProgress = fractionFromX(change.position.x)
+                                },
+                                onDragEnd = {
+                                    onSeekTo((dragProgress * totalDurationMs).toLong())
+                                    isDragging = false
+                                },
+                                onDragCancel = {
+                                    isDragging = false
+                                }
+                            )
+                        }
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            LinearWavyProgressIndicator(
+                progress = { displayedProgress },
+                modifier = Modifier.fillMaxWidth(),
+                color = AppTheme.colors.indicator,
+                trackColor = AppTheme.colors.trackIndicator.copy(alpha = 0.35f),
+                amplitude = { waveAmplitude },
+                wavelength = PlayerDefaults.WaveLength,
+                waveSpeed = PlayerDefaults.WaveSpeed
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            BodyText(
+                text = formatTrackTime(displayedPositionMs),
+                color = if (isDragging) AppTheme.colors.textPrimary else AppTheme.colors.textSecondary,
+                style = AppTheme.typography.labelSmall,
+                fontWeight = if (isDragging) FontWeight.Bold else FontWeight.Normal
+            )
+            BodyText(
+                text = formatTrackTime(totalDurationMs),
+                color = AppTheme.colors.textSecondary,
+                style = AppTheme.typography.labelSmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerControlsSection(
+    hasTrack: Boolean,
+    isPlaying: Boolean,
+    isLiked: Boolean,
+    onToggleLike: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipNext: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        FilledTonalIconButton(
+            onClick = onToggleLike,
+            enabled = hasTrack,
+            modifier = Modifier.size(PlayerDefaults.ControlButtonSize),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = if (isLiked) {
+                    AppTheme.colors.buttonFilled.copy(alpha = 0.18f)
+                } else {
+                    AppTheme.colors.buttonSecondary
+                },
+                contentColor = AppTheme.colors.indicator,
+                disabledContainerColor = AppTheme.colors.buttonSecondary.copy(alpha = 0.5f)
+            )
+        ) {
+            Icon(
+                imageVector = if (isLiked) {
+                    ImageVector.vectorResource(R.drawable.fill_favorite)
+                } else {
+                    ImageVector.vectorResource(R.drawable.outline_favorite)
+                },
+                contentDescription = if (isLiked) "Видалити з улюблених" else "Додати в улюблені",
+                tint = if (isLiked) {
+                    AppTheme.colors.indicator
+                } else {
+                    AppTheme.colors.iconSecondary
+                }
+            )
+        }
+
+        VibePulseButton(
+            onClick = onTogglePlayPause,
+            shape = CircleShape,
+            contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
+            modifier = Modifier.height(PlayerDefaults.PlayButtonHeight)
+        ) {
+            PlayPauseGlyph(
+                isPlaying = isPlaying,
+                color = AppTheme.colors.iconFilled,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        FilledTonalIconButton(
+            onClick = onSkipNext,
+            modifier = Modifier.size(PlayerDefaults.ControlButtonSize),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = AppTheme.colors.buttonSecondary,
+                contentColor = AppTheme.colors.indicator
+            )
+        ) {
+            SkipNextGlyph(
+                color = AppTheme.colors.iconPrimary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+private class ExpressiveMorphShape(
+    private val morphs: List<Morph>,
+    private val cycleProgressState: State<Float>
+) : Shape {
+    private val matrix = Matrix()
+    private val androidPath = android.graphics.Path()
+
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val cycle = cycleProgressState.value
+        val index = cycle.toInt() % morphs.size
+        val fraction = cycle - cycle.toInt()
+
+        androidPath.rewind()
+        morphs[index].toPath(progress = fraction, path = androidPath)
+
+        val composePath = androidPath.asComposePath()
+        matrix.reset()
+        matrix.scale(size.width, size.height)
+        composePath.transform(matrix)
+        return Outline.Generic(composePath)
+    }
+}
+
 @Composable
 private fun PlayPauseGlyph(
     isPlaying: Boolean,

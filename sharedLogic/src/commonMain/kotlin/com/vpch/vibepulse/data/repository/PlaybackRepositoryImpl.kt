@@ -1,8 +1,8 @@
 package com.vpch.vibepulse.data.playback
 
+import com.vpch.vibepulse.domain.model.PlaybackSnapshot
 import com.vpch.vibepulse.domain.model.Track
 import com.vpch.vibepulse.domain.repository.PlaybackRepository
-import com.vpch.vibepulse.domain.repository.PlaybackSnapshot
 import com.vpch.vibepulse.player.SpotifyRemoteClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
