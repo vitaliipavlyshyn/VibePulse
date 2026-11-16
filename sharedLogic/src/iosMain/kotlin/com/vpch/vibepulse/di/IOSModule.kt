@@ -28,17 +28,31 @@ val iosModule = module {
         object : SpotifyRemoteClient {
             override val isConnected: Boolean = false
             override val playbackState: StateFlow<RemotePlaybackState?> = MutableStateFlow(null)
-            override suspend fun connect(): Result<Unit> = Result.failure(UnsupportedOperationException("iOS SDK not linked yet"))
-            override fun disconnect() {}
-            override suspend fun play(uri: String): Result<Unit> = Result.failure(UnsupportedOperationException())
-            override suspend fun queue(uri: String): Result<Unit> = Result.failure(UnsupportedOperationException())
-            override suspend fun pause(): Result<Unit> = Result.failure(UnsupportedOperationException())
-            override fun pauseImmediate() {
-                TODO("Not yet implemented")
-            }
 
-            override suspend fun resume(): Result<Unit> = Result.failure(UnsupportedOperationException())
-            override suspend fun skipNext(): Result<Unit> = Result.failure(UnsupportedOperationException())
+            override suspend fun connect(): Result<Unit> =
+                Result.failure(UnsupportedOperationException("iOS SDK not linked yet"))
+
+            override fun disconnect() = Unit
+
+            override suspend fun play(uri: String): Result<Unit> =
+                Result.failure(UnsupportedOperationException())
+
+            override suspend fun queue(uri: String): Result<Unit> =
+                Result.failure(UnsupportedOperationException())
+
+            override suspend fun pause(): Result<Unit> =
+                Result.failure(UnsupportedOperationException())
+
+            override fun pauseImmediate() = Unit
+
+            override suspend fun resume(): Result<Unit> =
+                Result.failure(UnsupportedOperationException())
+
+            override suspend fun skipNext(): Result<Unit> =
+                Result.failure(UnsupportedOperationException())
+
+            override suspend fun seekTo(positionMs: Long): Result<Unit> =
+                Result.failure(UnsupportedOperationException())
         }
     }
 
