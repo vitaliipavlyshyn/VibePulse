@@ -40,8 +40,28 @@ buildkonfig {
         )
         buildConfigField(
             FieldSpec.Type.STRING,
+            "SPOTIFY_AUTH_BASE_URL",
+            "https://accounts.spotify.com/"
+        )
+        buildConfigField(
+            FieldSpec.Type.STRING,
             "RECCOBEATS_BASE_URL",
             "https://api.reccobeats.com/v1/"
+        )
+        buildConfigField(
+            FieldSpec.Type.STRING,
+            "OPENWEATHER_BASE_URL",
+            "https://api.openweathermap.org/data/2.5/"
+        )
+        buildConfigField(
+            FieldSpec.Type.STRING,
+            "OPENWEATHER_GEO_BASE_URL",
+            "https://api.openweathermap.org/geo/1.0/"
+        )
+        buildConfigField(
+            FieldSpec.Type.STRING,
+            "SPOTIFY_REDIRECT_URI",
+            "vibepulse://spotify-callback"
         )
     }
 }
@@ -54,6 +74,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "SharedLogic"
             isStatic = true
+            export(libs.androidx.lifecycle.viewmodelCompose)
         }
     }
     android {
@@ -91,7 +112,7 @@ kotlin {
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
+            api(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.multiplatform.settings)
             implementation(libs.ktor.client.auth)
         }

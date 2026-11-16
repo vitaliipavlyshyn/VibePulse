@@ -30,3 +30,9 @@ data class MainWeatherDto(
 data class WindDto(
     @SerialName("speed") val speed: Double
 )
+
+@Serializable
+data class GeoLocationDto(
+    @SerialName("name") val name: String = "",
+    @SerialName("local_names") val localNames: Map<String, String> = emptyMap()
+)

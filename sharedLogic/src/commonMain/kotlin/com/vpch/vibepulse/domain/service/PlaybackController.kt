@@ -23,6 +23,12 @@ class PlaybackController(
     var remainingTrackMs: Long = Long.MAX_VALUE
         private set
 
+    var trackPositionMs: Long = 0L
+        private set
+
+    var trackDurationMs: Long = 0L
+        private set
+
     val isRemoteConnected: Boolean
         get() = spotifyRemoteClient.isConnected
 
@@ -30,6 +36,8 @@ class PlaybackController(
     private var lastQueuedForTrackUri: String? = null
     private var lastPlayStateCommandMark: TimeMark? = null
     private val playStateGracePeriod = 2.5.seconds
+    private var lastSeekCommandMark: TimeMark? = null
+    private val seekGracePeriod = 2.seconds
 
     private val _queue = ArrayDeque<Track>()
     val queue: List<Track> get() = _queue.toList()
@@ -71,8 +79,11 @@ class PlaybackController(
                 _queue.addAll(tracks.drop(1))
                 isPlaying = true
                 lastQueuedForTrackUri = null
-                remainingTrackMs = Long.MAX_VALUE
+                trackPositionMs = 0L
+                trackDurationMs = first.durationMs
+                remainingTrackMs = if (first.durationMs > 0L) first.durationMs else Long.MAX_VALUE
                 lastPlayStateCommandMark = TimeSource.Monotonic.markNow()
+                lastSeekCommandMark = null
             }
         } finally {
             isCommandInFlight = false
@@ -83,14 +94,28 @@ class PlaybackController(
         if (isCommandInFlight) return Result.success(Unit)
         isCommandInFlight = true
 
+        val previousIsPlaying = isPlaying
+        isPlaying = true
+        lastPlayStateCommandMark = TimeSource.Monotonic.markNow()
+
         return try {
             val activeTrack = currentTrack
-            val remoteResult = if (activeTrack != null) {
+            val loadedUri = spotifyRemoteClient.playbackState.value?.trackUri
+            val isSameTrackLoaded = activeTrack == null || loadedUri == activeTrack.spotifyUri
+
+            val remoteResult = if (isSameTrackLoaded) {
+                spotifyRemoteClient.resume().recoverCatching {
+                    if (activeTrack != null) {
+                        spotifyRemoteClient.play(activeTrack.spotifyUri).getOrThrow()
+                        _queue.forEach { spotifyRemoteClient.queue(it.spotifyUri) }
+                    } else {
+                        throw it
+                    }
+                }
+            } else {
                 spotifyRemoteClient.play(activeTrack.spotifyUri).onSuccess {
                     _queue.forEach { spotifyRemoteClient.queue(it.spotifyUri) }
                 }
-            } else {
-                spotifyRemoteClient.resume()
             }
 
             val result = if (remoteResult.isSuccess) {
@@ -99,15 +124,14 @@ class PlaybackController(
                 resumeViaWebApi()
             }
 
-            result.onSuccess {
-                isPlaying = true
-                lastPlayStateCommandMark = TimeSource.Monotonic.markNow()
+            result.onFailure {
+                isPlaying = previousIsPlaying
+                lastPlayStateCommandMark = null
             }
         } finally {
             isCommandInFlight = false
         }
     }
-
     suspend fun enqueueNextIfNeeded(nextTrackProvider: suspend () -> Track?) {
         val activeUri = currentTrack?.spotifyUri ?: return
         if (lastQueuedForTrackUri == activeUri || _queue.size >= 2) return
@@ -147,10 +171,12 @@ class PlaybackController(
 
             result.onSuccess {
                 isPlaying = true
+                trackPositionMs = 0L
+                trackDurationMs = 0L
                 remainingTrackMs = Long.MAX_VALUE
                 lastPlayStateCommandMark = TimeSource.Monotonic.markNow()
+                lastSeekCommandMark = null
 
-                // Чекаємо коротку затримку, щоб Spotify перемкнув трек, і одразу читаємо реальну назву
                 delay(300.milliseconds)
                 refreshActualTrack(previousUri)
             }
@@ -162,6 +188,7 @@ class PlaybackController(
     suspend fun syncPlaybackState() {
         if (isCommandInFlight) return
         val inPlayStateGrace = (lastPlayStateCommandMark?.elapsedNow() ?: playStateGracePeriod) < playStateGracePeriod
+        val inSeekGrace = (lastSeekCommandMark?.elapsedNow() ?: seekGracePeriod) < seekGracePeriod
 
         val remoteState = spotifyRemoteClient.playbackState.value
         if (spotifyRemoteClient.isConnected && remoteState != null) {
@@ -169,10 +196,14 @@ class PlaybackController(
                 isPlaying = !remoteState.isPaused
             }
 
-            remainingTrackMs = if (remoteState.durationMs > 0) {
-                (remoteState.durationMs - remoteState.positionMs).coerceAtLeast(0L)
-            } else {
-                Long.MAX_VALUE
+            trackDurationMs = remoteState.durationMs.coerceAtLeast(0L)
+            if (!inSeekGrace) {
+                trackPositionMs = remoteState.positionMs.coerceAtLeast(0L)
+                remainingTrackMs = if (trackDurationMs > 0L) {
+                    (trackDurationMs - trackPositionMs).coerceAtLeast(0L)
+                } else {
+                    Long.MAX_VALUE
+                }
             }
 
             if (remoteState.trackUri.isNotBlank() && remoteState.trackUri != currentTrack?.spotifyUri) {
@@ -181,12 +212,19 @@ class PlaybackController(
             return
         }
 
-        syncStateViaWebApi(ignoreIsPlaying = inPlayStateGrace)
+        syncStateViaWebApi(
+            ignoreIsPlaying = inPlayStateGrace,
+            ignorePosition = inSeekGrace
+        )
     }
 
     suspend fun pause(): Result<Unit> {
         if (isCommandInFlight) return Result.success(Unit)
         isCommandInFlight = true
+
+        val previousIsPlaying = isPlaying
+        isPlaying = false
+        lastPlayStateCommandMark = TimeSource.Monotonic.markNow()
 
         return try {
             val result = if (spotifyRemoteClient.isConnected) {
@@ -197,9 +235,9 @@ class PlaybackController(
                 pauseViaWebApi()
             }
 
-            result.onSuccess {
-                isPlaying = false
-                lastPlayStateCommandMark = TimeSource.Monotonic.markNow()
+            result.onFailure {
+                isPlaying = previousIsPlaying
+                lastPlayStateCommandMark = null
             }
         } finally {
             isCommandInFlight = false
@@ -216,6 +254,32 @@ class PlaybackController(
 
     fun disconnectRemote() {
         spotifyRemoteClient.disconnect()
+    }
+
+    suspend fun seekTo(positionMs: Long): Result<Unit> {
+        val targetMs = positionMs.coerceAtLeast(0L)
+        if (isCommandInFlight) return Result.success(Unit)
+        isCommandInFlight = true
+
+        return try {
+            val result = if (spotifyRemoteClient.isConnected) {
+                spotifyRemoteClient.seekTo(targetMs).recoverCatching {
+                    spotifyApiService.seekTo(targetMs).getOrThrow()
+                }
+            } else {
+                spotifyApiService.seekTo(targetMs)
+            }
+
+            result.onSuccess {
+                trackPositionMs = targetMs
+                if (trackDurationMs > 0L) {
+                    remainingTrackMs = (trackDurationMs - targetMs).coerceAtLeast(0L)
+                }
+                lastSeekCommandMark = TimeSource.Monotonic.markNow()
+            }
+        } finally {
+            isCommandInFlight = false
+        }
     }
 
     private suspend fun refreshActualTrack(previousUri: String?) {
@@ -287,7 +351,10 @@ class PlaybackController(
         }
     }
 
-    private suspend fun syncStateViaWebApi(ignoreIsPlaying: Boolean = false) {
+    private suspend fun syncStateViaWebApi(
+        ignoreIsPlaying: Boolean = false,
+        ignorePosition: Boolean = false
+    ) {
         spotifyApiService.getPlaybackState().onSuccess { state ->
             val remoteTrack = state?.item?.toDomain()
             if (remoteTrack != null && remoteTrack.spotifyUri != currentTrack?.spotifyUri) {
@@ -301,7 +368,15 @@ class PlaybackController(
 
             val duration = state?.item?.durationMs ?: 0L
             val progress = state?.progressMs ?: 0L
-            remainingTrackMs = if (duration > 0) (duration - progress).coerceAtLeast(0L) else Long.MAX_VALUE
+            trackDurationMs = duration.coerceAtLeast(0L)
+            if (!ignorePosition) {
+                trackPositionMs = progress.coerceAtLeast(0L)
+                remainingTrackMs = if (trackDurationMs > 0L) {
+                    (trackDurationMs - trackPositionMs).coerceAtLeast(0L)
+                } else {
+                    Long.MAX_VALUE
+                }
+            }
         }
     }
 

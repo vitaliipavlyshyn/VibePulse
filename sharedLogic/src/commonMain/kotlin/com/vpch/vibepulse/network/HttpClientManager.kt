@@ -48,6 +48,8 @@ fun createSpotifyApiClient(
         url(baseUrl)
     }
 
+    val expectedHost = io.ktor.http.Url(baseUrl).host
+
     install(Auth) {
         bearer {
             loadTokens {
@@ -70,7 +72,7 @@ fun createSpotifyApiClient(
             }
 
             sendWithoutRequest { request ->
-                request.url.host == "api.spotify.com"
+                request.url.host == expectedHost
             }
         }
     }

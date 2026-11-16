@@ -39,6 +39,7 @@ class SpotifyAuthService(
         currentCodeVerifier = verifier
 
         val codeChallenge = generateCodeChallenge(verifier)
+        val authBase = config.authBaseUrl.trimEnd('/')
 
         val scopes = listOf(
             "user-read-private",
@@ -49,7 +50,7 @@ class SpotifyAuthService(
             "app-remote-control"
         ).joinToString("%20")
 
-        return "https://accounts.spotify.com/authorize?" +
+        return "$authBase/authorize?" +
                 "client_id=${config.clientId}" +
                 "&response_type=code" +
                 "&redirect_uri=${config.redirectUri}" +
@@ -62,9 +63,11 @@ class SpotifyAuthService(
         val verifier = currentCodeVerifier
             ?: return Result.failure(IllegalStateException("Code verifier not found"))
 
+        val tokenUrl = "${config.authBaseUrl.trimEnd('/')}/api/token"
+
         return runCatching {
             val response = httpClient.submitForm(
-                url = "https://accounts.spotify.com/api/token",
+                url = tokenUrl,
                 formParameters = Parameters.build {
                     append("grant_type", "authorization_code")
                     append("code", code)
@@ -94,9 +97,11 @@ class SpotifyAuthService(
         val refreshToken = tokenStorage.getRefreshToken()
             ?: return Result.failure(IllegalStateException("No refresh token available"))
 
+        val tokenUrl = "${config.authBaseUrl.trimEnd('/')}/api/token"
+
         return runCatching {
             val response = httpClient.submitForm(
-                url = "https://accounts.spotify.com/api/token",
+                url = tokenUrl,
                 formParameters = Parameters.build {
                     append("grant_type", "refresh_token")
                     append("refresh_token", refreshToken)

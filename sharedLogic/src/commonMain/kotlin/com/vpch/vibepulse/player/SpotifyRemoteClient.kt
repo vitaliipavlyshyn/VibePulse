@@ -24,4 +24,5 @@ interface SpotifyRemoteClient {
     fun pauseImmediate()
     suspend fun resume(): Result<Unit>
     suspend fun skipNext(): Result<Unit>
+    suspend fun seekTo(positionMs: Long): Result<Unit>
 }

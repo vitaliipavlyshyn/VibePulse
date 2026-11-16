@@ -154,7 +154,7 @@ class PlaylistGenerator(
         }
 
         val condition = if (preferences?.weatherEnabled != false) {
-            weather?.condition?.lowercase().orEmpty()
+            weather?.conditionMain?.lowercase().orEmpty()
         } else {
             ""
         }
@@ -243,7 +243,7 @@ class PlaylistGenerator(
         }
 
         val targetValence = if (weatherEnabled && weather != null) {
-            when (weather.condition.lowercase()) {
+            when (weather.conditionMain.lowercase()) {
                 "clear" -> 0.75
                 "clouds" -> 0.50
                 "rain", "drizzle", "thunderstorm" -> 0.35

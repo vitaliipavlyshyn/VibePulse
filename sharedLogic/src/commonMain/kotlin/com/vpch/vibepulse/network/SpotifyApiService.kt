@@ -150,6 +150,12 @@ class SpotifyApiService(
         }
     }
 
+    suspend fun seekTo(positionMs: Long): Result<Unit> = executePlaybackCommand {
+        httpClient.put("https://api.spotify.com/v1/me/player/seek") {
+            parameter("position_ms", positionMs.coerceAtLeast(0L))
+        }
+    }
+
     suspend fun saveTrack(trackId: String): Result<Unit> = executeLibraryCommand {
         val cleanId = trackId.substringAfterLast(":").trim()
         httpClient.put("me/tracks") {

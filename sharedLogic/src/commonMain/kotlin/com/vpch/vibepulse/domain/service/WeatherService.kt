@@ -4,18 +4,19 @@ import com.vpch.vibepulse.domain.model.WeatherSnapshot
 import com.vpch.vibepulse.location.LocationProvider
 import com.vpch.vibepulse.network.WeatherApiService
 import com.vpch.vibepulse.utils.toDomain
+import kotlin.time.Duration
 
 class WeatherService(
     private val weatherApiService: WeatherApiService,
     private val locationProvider: LocationProvider,
-    val cacheTtlMinutes: Int = 45
+    private val cacheTtl: Duration = WeatherSnapshot.DEFAULT_CACHE_TTL
 ) {
     var lastSnapshot: WeatherSnapshot? = null
         private set
 
     suspend fun getWeather(forceRefresh: Boolean = false): Result<WeatherSnapshot> {
         val cached = lastSnapshot
-        if (!forceRefresh && cached != null && cached.isFresh(cacheTtlMinutes)) {
+        if (!forceRefresh && cached != null && cached.isFresh(cacheTtl)) {
             return Result.success(cached)
         }
 

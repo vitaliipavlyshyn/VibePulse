@@ -27,8 +27,3 @@ fun TrackDto.toDomain(): Track {
     )
 }
 
-fun WeatherResponse.toDomain(): WeatherSnapshot = WeatherSnapshot(
-    area = cityName,
-    temperature = main.temp,
-    condition = weather.firstOrNull()?.main ?: "Clear"
-)

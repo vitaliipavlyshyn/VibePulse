@@ -6,6 +6,19 @@ data class User(
     val hasPremium: Boolean,
     val avatarUrl: String? = null
 ) {
+    constructor(
+        id: String,
+        displayName: String,
+        email: String? = null,
+        avatarUrl: String? = null,
+        hasPremium: Boolean = false
+    ) : this(
+        spotifyId = id,
+        displayName = displayName,
+        hasPremium = hasPremium,
+        avatarUrl = avatarUrl
+    )
+
     fun signIn(): Boolean = spotifyId.isNotBlank()
     fun signOut() {
         TODO()
