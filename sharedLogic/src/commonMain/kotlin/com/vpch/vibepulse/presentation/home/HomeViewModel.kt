@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vpch.vibepulse.domain.coordinator.ActivityCoordinator
 import com.vpch.vibepulse.domain.model.Activity
+import com.vpch.vibepulse.domain.model.CadenceZone
 import com.vpch.vibepulse.domain.model.Track
 import com.vpch.vibepulse.domain.model.User
 import com.vpch.vibepulse.domain.model.WeatherSnapshot
@@ -50,6 +51,7 @@ sealed interface HomeUiState {
         val isLikeInProgress: Boolean = false,
         val runStatus: RunStatus = RunStatus.IDLE,
         val currentCadence: Int = 0,
+        val cadenceZone: CadenceZone = CadenceZone.IDLE,
         val elapsedSeconds: Long = 0L,
         val trackPositionMs: Long = 0L,
         val trackDurationMs: Long = 0L,
@@ -78,7 +80,9 @@ class HomeViewModel(
     val effects = _effects.receiveAsFlow()
 
     private var timerJob: Job? = null
+    private var playerProgressJob: Job? = null
     private var lastCheckedLikedUri: String? = null
+    private var lastSyncedControllerPosMs: Long = -1L
 
     init {
         onIntent(HomeIntent.LoadInitialData)
@@ -104,6 +108,7 @@ class HomeViewModel(
 
             HomeIntent.TogglePlayPauseClicked -> togglePlayPause()
             HomeIntent.SkipNextClicked -> skipToNext()
+            is HomeIntent.SeekTo -> seekTo(intent.positionMs)
             HomeIntent.ToggleLikeClicked -> toggleLike()
         }
     }
@@ -144,6 +149,7 @@ class HomeViewModel(
     private fun logoutAndRedirect() {
         viewModelScope.launch {
             timerJob?.cancel()
+            playerProgressJob?.cancel()
             runTrackerNotifier.onRunStopped()
             activityCoordinator.playbackController.pauseImmediate()
             activityCoordinator.playbackController.pause()
@@ -228,8 +234,10 @@ class HomeViewModel(
 
     private fun loadPlaybackState() {
         viewModelScope.launch {
-            activityCoordinator.playbackController.connectRemote()
-            activityCoordinator.playbackController.syncPlaybackState()
+            val connected = activityCoordinator.playbackController.connectRemote().isSuccess
+            if (!connected || activityCoordinator.playbackController.currentTrack == null) {
+                activityCoordinator.playbackController.syncPlaybackState()
+            }
             syncPlayerUi()
         }
     }
@@ -263,6 +271,7 @@ class HomeViewModel(
 
     private fun pauseRun() {
         timerJob?.cancel()
+        ensurePlayerProgressLoop(false)
         activityCoordinator.pauseSession()
         activityCoordinator.playbackController.pauseImmediate()
 
@@ -293,7 +302,13 @@ class HomeViewModel(
             elapsedSeconds = state?.elapsedSeconds ?: 0L,
             isPaused = false
         )
-        updateSuccessState { it.copy(runStatus = RunStatus.RUNNING) }
+        updateSuccessState {
+            it.copy(
+                runStatus = RunStatus.RUNNING,
+                isPlaying = true
+            )
+        }
+        ensurePlayerProgressLoop(true)
         startTimer()
 
         viewModelScope.launch {
@@ -315,6 +330,7 @@ class HomeViewModel(
                 runStatus = RunStatus.IDLE,
                 elapsedSeconds = 0L,
                 currentCadence = 0,
+                cadenceZone = CadenceZone.IDLE,
                 isPlaying = false
             )
         }
@@ -332,17 +348,22 @@ class HomeViewModel(
                 delay(1000.milliseconds)
                 activityCoordinator.onTick()
 
+                val controller = activityCoordinator.playbackController
                 updateSuccessState { state ->
                     val activeSession = activityCoordinator.activity
+                    val spm = activeSession?.samples?.lastOrNull()?.stepsPerMinute ?: 0
                     state.copy(
                         elapsedSeconds = state.elapsedSeconds + 1,
                         activity = activeSession,
                         weather = activeSession?.weather ?: state.weather,
-                        currentCadence = activeSession?.samples?.lastOrNull()?.stepsPerMinute ?: 0,
-                        currentTrack = activityCoordinator.playbackController.currentTrack ?: state.currentTrack,
-                        isPlaying = activityCoordinator.playbackController.isPlaying
+                        currentCadence = spm,
+                        cadenceZone = CadenceZone.fromSpm(spm),
+                        currentTrack = controller.currentTrack ?: state.currentTrack,
+                        isPlaying = controller.isPlaying
                     )
                 }
+
+                ensurePlayerProgressLoop(controller.isPlaying)
 
                 val updated = _uiState.value as? HomeUiState.Success
                 if (updated != null) {
@@ -359,9 +380,92 @@ class HomeViewModel(
         }
     }
 
+    private fun syncPlayerUi() {
+        val controller = activityCoordinator.playbackController
+        val activeTrack = controller.currentTrack
+        val controllerPos = controller.trackPositionMs
+        lastSyncedControllerPosMs = controllerPos
+
+        updateSuccessState { state ->
+            val resolvedTrack = activeTrack ?: state.currentTrack
+            val duration = controller.trackDurationMs.takeIf { it > 0L }
+                ?: resolvedTrack?.durationMs
+                ?: 0L
+
+            state.copy(
+                currentTrack = resolvedTrack,
+                isPlaying = controller.isPlaying,
+                trackPositionMs = controllerPos,
+                trackDurationMs = duration
+            )
+        }
+
+        ensurePlayerProgressLoop(controller.isPlaying)
+
+        val displayedTrack = (_uiState.value as? HomeUiState.Success)?.currentTrack
+        syncTrackLikedStatus(displayedTrack)
+    }
+
+    private fun ensurePlayerProgressLoop(isPlaying: Boolean) {
+        if (!isPlaying) {
+            playerProgressJob?.cancel()
+            playerProgressJob = null
+            return
+        }
+        if (playerProgressJob?.isActive == true) return
+
+        playerProgressJob = viewModelScope.launch {
+            var secondsSinceLastSync = 0
+            while (isActive) {
+                delay(1000.milliseconds)
+                val currentState = _uiState.value as? HomeUiState.Success ?: break
+                if (!currentState.isPlaying) break
+
+                secondsSinceLastSync++
+                val controller = activityCoordinator.playbackController
+                val syncInterval = if (controller.isRemoteConnected) 1 else 3
+
+                if (currentState.runStatus != RunStatus.RUNNING && secondsSinceLastSync >= syncInterval) {
+                    secondsSinceLastSync = 0
+                    controller.syncPlaybackState()
+                }
+
+                val activeTrack = controller.currentTrack ?: currentState.currentTrack
+                val duration = controller.trackDurationMs.takeIf { it > 0L }
+                    ?: activeTrack?.durationMs
+                    ?: 0L
+
+                val controllerPos = controller.trackPositionMs
+                val nextPosition = when {
+                    controllerPos != lastSyncedControllerPosMs -> {
+                        lastSyncedControllerPosMs = controllerPos
+                        controllerPos
+                    }
+                    duration > 0L -> (currentState.trackPositionMs + 1000L).coerceAtMost(duration)
+                    else -> currentState.trackPositionMs + 1000L
+                }
+
+                updateSuccessState { state ->
+                    state.copy(
+                        currentTrack = activeTrack,
+                        isPlaying = controller.isPlaying,
+                        trackPositionMs = nextPosition,
+                        trackDurationMs = duration
+                    )
+                }
+                syncTrackLikedStatus(activeTrack)
+            }
+        }
+    }
+
     private fun togglePlayPause() {
         val currentState = _uiState.value as? HomeUiState.Success ?: return
         val currentlyPlaying = currentState.isPlaying
+        val targetPlaying = !currentlyPlaying
+
+        // Миттєво оновлюємо UI при натисканні
+        updateSuccessState { it.copy(isPlaying = targetPlaying) }
+        ensurePlayerProgressLoop(targetPlaying)
 
         viewModelScope.launch {
             val result = if (currentlyPlaying) {
@@ -375,6 +479,8 @@ class HomeViewModel(
                     syncPlayerUi()
                 }
                 .onFailure { error ->
+                    updateSuccessState { it.copy(isPlaying = currentlyPlaying) }
+                    ensurePlayerProgressLoop(currentlyPlaying)
                     if (isUnauthorizedError(error)) {
                         handleSessionExpired()
                     } else {
@@ -453,17 +559,6 @@ class HomeViewModel(
         }
     }
 
-    private fun syncPlayerUi() {
-        val activeTrack = activityCoordinator.playbackController.currentTrack
-        updateSuccessState {
-            it.copy(
-                currentTrack = activeTrack ?: it.currentTrack,
-                isPlaying = activityCoordinator.playbackController.isPlaying
-            )
-        }
-        val displayedTrack = (_uiState.value as? HomeUiState.Success)?.currentTrack
-        syncTrackLikedStatus(displayedTrack)
-    }
 
     private fun syncTrackLikedStatus(track: Track?) {
         if (track == null) {
@@ -499,7 +594,35 @@ class HomeViewModel(
         }
     }
 
+    private fun seekTo(positionMs: Long) {
+        val currentState = _uiState.value as? HomeUiState.Success ?: return
+        if (currentState.currentTrack == null) return
+
+        val clampedMs = if (currentState.trackDurationMs > 0L) {
+            positionMs.coerceIn(0L, currentState.trackDurationMs)
+        } else {
+            positionMs.coerceAtLeast(0L)
+        }
+
+        lastSyncedControllerPosMs = clampedMs
+        updateSuccessState { it.copy(trackPositionMs = clampedMs) }
+
+        viewModelScope.launch {
+            activityCoordinator.playbackController.seekTo(clampedMs)
+                .onFailure { error ->
+                    if (isUnauthorizedError(error)) {
+                        handleSessionExpired()
+                    } else {
+                        _effects.send(
+                            HomeEffect.ShowMessage(error.message ?: "Не вдалося перемотати трек")
+                        )
+                    }
+                }
+        }
+    }
+
     override fun onCleared() {
+        playerProgressJob?.cancel()
         timerJob?.cancel()
         runTrackerNotifier.onRunStopped()
         activityCoordinator.playbackController.pauseImmediate()

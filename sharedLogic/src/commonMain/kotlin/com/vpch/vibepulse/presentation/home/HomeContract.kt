@@ -13,6 +13,7 @@ sealed interface HomeIntent {
     data object ToggleLikeClicked : HomeIntent
     data object TogglePlayPauseClicked : HomeIntent
     data object SkipNextClicked : HomeIntent
+    data class SeekTo(val positionMs: Long) : HomeIntent
     data object LogoutClicked : HomeIntent
 
 }
