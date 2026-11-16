@@ -2,15 +2,10 @@ package com.vpch.vibepulse.presentation.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vpch.vibepulse.domain.coordinator.ActivityCoordinator
 import com.vpch.vibepulse.domain.model.AppTierConfig
-import com.vpch.vibepulse.domain.model.PlaylistPreferences
-import com.vpch.vibepulse.domain.model.User
-import com.vpch.vibepulse.network.SpotifyApiService
-import com.vpch.vibepulse.service.RunTrackerNotifier
-import com.vpch.vibepulse.storage.PlaylistPreferencesStore
-import com.vpch.vibepulse.storage.TokenStorage
-import com.vpch.vibepulse.utils.toDomain
+import com.vpch.vibepulse.domain.repository.PreferencesRepository
+import com.vpch.vibepulse.domain.repository.UserRepository
+import com.vpch.vibepulse.domain.usecase.LogoutUseCase
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,30 +14,17 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class ProfileUiState(
-    val isLoading: Boolean = true,
-    val user: User? = null,
-    val isPremium: Boolean = false,
-    val preferences: PlaylistPreferences = PlaylistPreferences()
-)
-
-sealed interface ProfileEffect {
-    data object NavigateToAuth : ProfileEffect
-}
-
 class ProfileViewModel(
-    private val spotifyApiService: SpotifyApiService,
-    private val preferencesStore: PlaylistPreferencesStore,
+    private val userRepository: UserRepository,
+    private val preferencesRepository: PreferencesRepository,
     private val tierConfig: AppTierConfig,
-    private val tokenStorage: TokenStorage,
-    private val activityCoordinator: ActivityCoordinator,
-    private val runTrackerNotifier: RunTrackerNotifier
+    private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         ProfileUiState(
             isPremium = tierConfig.isPremium,
-            preferences = preferencesStore.preferences.value
+            preferences = preferencesRepository.preferences.value
         )
     )
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
@@ -53,7 +35,7 @@ class ProfileViewModel(
     init {
         loadProfile()
         viewModelScope.launch {
-            preferencesStore.preferences.collect { prefs ->
+            preferencesRepository.preferences.collect { prefs ->
                 _uiState.update { it.copy(preferences = prefs) }
             }
         }
@@ -61,12 +43,12 @@ class ProfileViewModel(
 
     private fun loadProfile() {
         viewModelScope.launch {
-            spotifyApiService.getCurrentUser()
-                .onSuccess { dto ->
+            userRepository.getCurrentUser()
+                .onSuccess { user ->
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            user = dto.toDomain(),
+                            user = user,
                             isPremium = tierConfig.isPremium
                         )
                     }
@@ -79,31 +61,27 @@ class ProfileViewModel(
 
     fun toggleGenre(genre: String) {
         if (!tierConfig.isPremium) return
-        preferencesStore.update { it.toggleGenre(genre) }
+        preferencesRepository.update { it.toggleGenre(genre) }
     }
 
     fun setWeatherEnabled(enabled: Boolean) {
         if (!tierConfig.isPremium) return
-        preferencesStore.update { it.copy(weatherEnabled = enabled) }
+        preferencesRepository.update { it.copy(weatherEnabled = enabled) }
     }
 
     fun setExcludeRemixesAndCovers(exclude: Boolean) {
         if (!tierConfig.isPremium) return
-        preferencesStore.update { it.copy(excludeRemixesAndCovers = exclude) }
+        preferencesRepository.update { it.copy(excludeRemixesAndCovers = exclude) }
     }
 
     fun setExcludeExplicit(exclude: Boolean) {
         if (!tierConfig.isPremium) return
-        preferencesStore.update { it.copy(excludeExplicit = exclude) }
+        preferencesRepository.update { it.copy(excludeExplicit = exclude) }
     }
 
     fun logout() {
         viewModelScope.launch {
-            runTrackerNotifier.onRunStopped()
-            activityCoordinator.playbackController.pauseImmediate()
-            activityCoordinator.playbackController.pause()
-            activityCoordinator.endSession()
-            tokenStorage.clearTokens()
+            logoutUseCase()
             _effects.send(ProfileEffect.NavigateToAuth)
         }
     }

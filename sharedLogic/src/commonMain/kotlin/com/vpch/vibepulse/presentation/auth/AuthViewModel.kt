@@ -2,7 +2,7 @@ package com.vpch.vibepulse.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vpch.vibepulse.network.SpotifyAuthService
+import com.vpch.vibepulse.domain.repository.AuthRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,26 +11,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
-sealed interface AuthUiState {
-    data object Idle: AuthUiState
-    data object Loading: AuthUiState
-    data object Success: AuthUiState
-    data class Error(val message: String): AuthUiState
-}
-
-
 class AuthViewModel(
-    private val spotifyAuthService: SpotifyAuthService
-): ViewModel() {
+    private val authRepository: AuthRepository
+) : ViewModel() {
+
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    private val _effects: Channel<AuthEffect> = Channel<AuthEffect>(Channel.BUFFERED)
+    private val _effects = Channel<AuthEffect>(Channel.BUFFERED)
     val effects: Flow<AuthEffect> = _effects.receiveAsFlow()
 
-
     fun onIntent(intent: AuthIntent) {
-        when(intent) {
+        when (intent) {
             is AuthIntent.ConnectSpotifyClicked -> handleConnectSpotify()
             is AuthIntent.AuthCodeReceived -> handleAuthCodeReceived(code = intent.code)
             is AuthIntent.AuthErrorReceived -> {
@@ -41,7 +33,7 @@ class AuthViewModel(
 
     private fun handleConnectSpotify() {
         _uiState.value = AuthUiState.Loading
-        val url = spotifyAuthService.buildAuthorizationUrl()
+        val url = authRepository.buildAuthorizationUrl()
         viewModelScope.launch {
             _effects.send(AuthEffect.OpenBrowser(url))
         }
@@ -50,8 +42,8 @@ class AuthViewModel(
     private fun handleAuthCodeReceived(code: String) {
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            spotifyAuthService.exchangeCodeForToken(code)
-                .onSuccess { tokenResponse ->
+            authRepository.exchangeCodeForToken(code)
+                .onSuccess {
                     _uiState.value = AuthUiState.Success
                     _effects.send(AuthEffect.NavigateToHome)
                 }
