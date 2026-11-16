@@ -52,7 +52,10 @@ import com.vpch.vibepulse.presentation.home.HomeEffect
 import com.vpch.vibepulse.presentation.home.HomeIntent
 import com.vpch.vibepulse.presentation.home.HomeUiState
 import com.vpch.vibepulse.presentation.home.HomeViewModel
+import com.vpch.vibepulse.presentation.home.PlayerUiState
 import com.vpch.vibepulse.presentation.home.RunStatus
+import com.vpch.vibepulse.presentation.home.RunUiState
+import com.vpch.vibepulse.presentation.home.WeatherUiState
 import com.vpch.vibepulse.screens.home.components.CadenceTrackerCard
 import com.vpch.vibepulse.screens.home.components.HomeHeaderSection
 import com.vpch.vibepulse.screens.home.components.RunControlsSection
@@ -205,27 +208,27 @@ fun HomeContent(
                 ) {
                     HomeHeaderSection(
                         user = uiState.user,
-                        weather = uiState.weather,
-                        isWeatherLoading = uiState.isWeatherLoading,
-                        hasLocationPermission = uiState.hasLocationPermission,
-                        isLocationEnabled = uiState.isLocationEnabled,
+                        weather = uiState.weather.snapshot,
+                        isWeatherLoading = uiState.weather.isLoading,
+                        hasLocationPermission = uiState.weather.hasPermission,
+                        isLocationEnabled = uiState.weather.isLocationEnabled,
                         onRefreshWeather = { onIntent(HomeIntent.RefreshWeather) },
                         onRequestLocation = onRequestPermissions,
                         onProfileClick = onNavigateToProfile
                     )
 
                     CadenceTrackerCard(
-                        runStatus = uiState.runStatus,
-                        currentCadence = uiState.currentCadence,
-                        cadenceZone = uiState.cadenceZone
+                        runStatus = uiState.run.status,
+                        currentCadence = uiState.run.currentCadence,
+                        cadenceZone = uiState.run.cadenceZone
                     )
 
                     SpotifyPlayerCard(
-                        track = uiState.currentTrack,
-                        isPlaying = uiState.isPlaying,
-                        isLiked = uiState.isTrackLiked,
-                        positionMs = uiState.trackPositionMs,
-                        durationMs = uiState.trackDurationMs,
+                        track = uiState.player.currentTrack,
+                        isPlaying = uiState.player.isPlaying,
+                        isLiked = uiState.player.isLiked,
+                        positionMs = uiState.player.positionMs,
+                        durationMs = uiState.player.durationMs,
                         onToggleLike = { onIntent(HomeIntent.ToggleLikeClicked) },
                         onTogglePlayPause = { onIntent(HomeIntent.TogglePlayPauseClicked) },
                         onSkipNext = { onIntent(HomeIntent.SkipNextClicked) },
@@ -233,15 +236,15 @@ fun HomeContent(
                     )
 
                     WorkoutTimerCard(
-                        runStatus = uiState.runStatus,
-                        elapsedSeconds = uiState.elapsedSeconds
+                        runStatus = uiState.run.status,
+                        elapsedSeconds = uiState.run.elapsedSeconds
                     )
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
                 RunControlsSection(
-                    runStatus = uiState.runStatus,
+                    runStatus = uiState.run.status,
                     onStart = { onIntent(HomeIntent.StartRunClicked) },
                     onPause = { onIntent(HomeIntent.PauseRunClicked) },
                     onResume = { onIntent(HomeIntent.ResumeRunClicked) },
@@ -265,28 +268,34 @@ fun HomeScreenRunningPreview() {
                         displayName = "Віталій",
                         hasPremium = true
                     ),
-                    weather = WeatherSnapshot(
-                        temperature = 18.4,
-                        condition = "Ясно",
-                        area = "Львів"
+                    weather = WeatherUiState(
+                        snapshot = WeatherSnapshot(
+                            temperature = 18.4,
+                            condition = "Ясно",
+                            area = "Львів"
+                        ),
+                        hasPermission = true,
+                        isLocationEnabled = true
                     ),
-                    currentTrack = Track(
-                        spotifyUri = "spotify:track:123",
-                        title = "Blinding Lights",
-                        artist = "The Weeknd",
-                        genre = "pop",
-                        tempo = 171,
+                    run = RunUiState(
+                        status = RunStatus.RUNNING,
+                        currentCadence = 168,
+                        elapsedSeconds = 845L
+                    ),
+                    player = PlayerUiState(
+                        currentTrack = Track(
+                            spotifyUri = "spotify:track:123",
+                            title = "Blinding Lights",
+                            artist = "The Weeknd",
+                            genre = "pop",
+                            tempo = 171,
+                            durationMs = 200_000L
+                        ),
+                        isPlaying = true,
+                        isLiked = true,
+                        positionMs = 84_000L,
                         durationMs = 200_000L
-                    ),
-                    isPlaying = true,
-                    isTrackLiked = true,
-                    runStatus = RunStatus.RUNNING,
-                    currentCadence = 168,
-                    elapsedSeconds = 845L,
-                    trackPositionMs = 84_000L,
-                    trackDurationMs = 200_000L,
-                    hasLocationPermission = true,
-                    isLocationEnabled = true
+                    )
                 ),
                 onIntent = {},
                 onRequestPermissions = {}
@@ -311,10 +320,7 @@ fun HomeScreenIdleDarkPreview() {
                         displayName = "Віталій",
                         hasPremium = false
                     ),
-                    runStatus = RunStatus.IDLE,
-                    currentCadence = 0,
-                    elapsedSeconds = 0L,
-                    hasLocationPermission = false
+                    weather = WeatherUiState(hasPermission = false)
                 ),
                 onIntent = {},
                 onRequestPermissions = {}
@@ -323,9 +329,4 @@ fun HomeScreenIdleDarkPreview() {
     }
 }
 
-private fun isSystemLocationEnabled(context: Context): Boolean {
-    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-        ?: return false
-    return LocationManagerCompat.isLocationEnabled(locationManager)
-}
 
