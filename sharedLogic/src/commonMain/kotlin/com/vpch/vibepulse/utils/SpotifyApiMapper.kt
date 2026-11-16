@@ -1,11 +1,10 @@
 package com.vpch.vibepulse.utils
 
 import com.vpch.vibepulse.domain.model.Track
+import com.vpch.vibepulse.domain.model.TrackCandidate
 import com.vpch.vibepulse.domain.model.User
-import com.vpch.vibepulse.domain.model.WeatherSnapshot
 import com.vpch.vibepulse.network.model.SpotifyUserProfileDto
 import com.vpch.vibepulse.network.model.TrackDto
-import com.vpch.vibepulse.network.model.WeatherResponse
 
 fun SpotifyUserProfileDto.toDomain(): User = User(
     spotifyId = id,
@@ -28,3 +27,8 @@ fun TrackDto.toDomain(): Track {
     )
 }
 
+fun TrackDto.toCandidate(): TrackCandidate = TrackCandidate(
+    track = toDomain(),
+    popularity = popularity,
+    isPlayable = isPlayable
+)

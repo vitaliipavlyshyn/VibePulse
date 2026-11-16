@@ -3,6 +3,7 @@ package com.vpch.vibepulse.storage
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.set
 import com.vpch.vibepulse.domain.model.PlaylistPreferences
+import com.vpch.vibepulse.domain.repository.PreferencesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,11 +11,11 @@ import kotlinx.coroutines.flow.update
 
 class PlaylistPreferencesStore(
     private val settings: Settings
-) {
+) : PreferencesRepository {
     private val _preferences = MutableStateFlow(loadFromSettings())
-    val preferences: StateFlow<PlaylistPreferences> = _preferences.asStateFlow()
+    override val preferences: StateFlow<PlaylistPreferences> = _preferences.asStateFlow()
 
-    fun update(transform: (PlaylistPreferences) -> PlaylistPreferences) {
+    override fun update(transform: (PlaylistPreferences) -> PlaylistPreferences) {
         _preferences.update { current ->
             val updated = transform(current)
             saveToSettings(updated)
@@ -22,7 +23,7 @@ class PlaylistPreferencesStore(
         }
     }
 
-    fun reset() {
+    override fun reset() {
         val defaults = PlaylistPreferences()
         saveToSettings(defaults)
         _preferences.value = defaults

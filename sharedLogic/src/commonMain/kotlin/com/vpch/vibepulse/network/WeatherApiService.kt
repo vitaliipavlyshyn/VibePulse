@@ -7,10 +7,10 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-
 
 class WeatherApiService(
     private val httpClient: HttpClient,
@@ -48,7 +48,8 @@ class WeatherApiService(
 
             val weatherResponse = weatherDeferred.await()
             if (!weatherResponse.status.isSuccess()) {
-                throw Exception("Weather API error: HTTP ${weatherResponse.status.value}")
+                val errorBody = runCatching { weatherResponse.bodyAsText() }.getOrDefault("")
+                throw Exception("Weather API (${weatherResponse.status.value}): $errorBody")
             }
 
             val weather = weatherResponse.body<WeatherResponse>()
@@ -61,18 +62,11 @@ class WeatherApiService(
                 geo.localNames[lang] ?: geo.name
             }?.takeIf { it.isNotBlank() }
 
-
-            if (!weatherResponse.status.isSuccess()) {
-                val errorBody = runCatching { weatherResponse.body<String>() }.getOrDefault("")
-                throw Exception("Weather API (${weatherResponse.status.value}): $errorBody")
-            }
-
             if (localizedCity != null) {
                 weather.copy(cityName = localizedCity)
             } else {
                 weather
             }
-
         }
     }
 

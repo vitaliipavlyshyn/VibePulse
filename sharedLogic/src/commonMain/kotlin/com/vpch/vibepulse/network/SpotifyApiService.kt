@@ -151,8 +151,12 @@ class SpotifyApiService(
     }
 
     suspend fun seekTo(positionMs: Long): Result<Unit> = executePlaybackCommand {
-        httpClient.put("https://api.spotify.com/v1/me/player/seek") {
+        val targetDeviceId = resolveTargetDeviceId()
+        httpClient.put("me/player/seek") {
             parameter("position_ms", positionMs.coerceAtLeast(0L))
+            if (targetDeviceId != null) {
+                parameter("device_id", targetDeviceId)
+            }
         }
     }
 

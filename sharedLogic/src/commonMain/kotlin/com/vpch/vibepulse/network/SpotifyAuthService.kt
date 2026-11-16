@@ -2,29 +2,15 @@ package com.vpch.vibepulse.network
 
 import com.vpch.vibepulse.PkceUtil
 import com.vpch.vibepulse.generateCodeChallenge
+import com.vpch.vibepulse.network.model.SpotifyErrorResponse
+import com.vpch.vibepulse.network.model.SpotifyTokenResponse
 import com.vpch.vibepulse.storage.TokenStorage
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.forms.submitForm
 import io.ktor.http.Parameters
 import io.ktor.http.isSuccess
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
-@Serializable
-data class SpotifyTokenResponse(
-    @SerialName("access_token") val accessToken: String,
-    @SerialName("token_type") val tokenType: String,
-    @SerialName("expires_in") val expiresIn: Int,
-    @SerialName("refresh_token") val refreshToken: String? = null,
-    @SerialName("scope") val scope: String? = null,
-)
-
-@Serializable
-data class SpotifyErrorResponse(
-    @SerialName("error") val error: String,
-    @SerialName("error_description") val errorDescription: String? = null
-)
 
 class SpotifyAuthService(
     private val httpClient: HttpClient,
