@@ -1,29 +1,38 @@
 package com.vpch.vibepulse.domain.coordinator
 
 import com.vpch.vibepulse.domain.model.Activity
+import com.vpch.vibepulse.domain.model.CadenceZone
 import com.vpch.vibepulse.domain.model.PaceZone
 import com.vpch.vibepulse.domain.model.PlaylistPreferences
 import com.vpch.vibepulse.domain.model.User
 import com.vpch.vibepulse.domain.model.WeatherSnapshot
-import com.vpch.vibepulse.domain.service.PlaybackController
-import com.vpch.vibepulse.domain.service.PlaylistGenerator
-import com.vpch.vibepulse.domain.service.WeatherService
+import com.vpch.vibepulse.domain.repository.PlaybackRepository
+import com.vpch.vibepulse.domain.repository.WeatherRepository
+import com.vpch.vibepulse.domain.usecase.GenerateWorkoutPlaylistUseCase
 import com.vpch.vibepulse.sensor.CadenceMeter
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlin.math.abs
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-class ActivityCoordinator(
-    val cadenceMeter: CadenceMeter,
-    val weatherService: WeatherService,
-    val playlistGenerator: PlaylistGenerator,
-    val playbackController: PlaybackController
-) {
-    var activity: Activity? = null
-        private set
+data class WorkoutSessionSnapshot(
+    val activity: Activity? = null,
+    val currentZone: PaceZone? = null,
+    val currentCadence: Int = 0,
+    val cadenceZone: CadenceZone = CadenceZone.IDLE
+)
 
-    var currentZone: PaceZone? = null
-        private set
+class ActivityCoordinator(
+    private val cadenceMeter: CadenceMeter,
+    private val weatherRepository: WeatherRepository,
+    private val generatePlaylist: GenerateWorkoutPlaylistUseCase,
+    private val playbackRepository: PlaybackRepository
+) {
+    private val _sessionState = MutableStateFlow(WorkoutSessionSnapshot())
+    val sessionState: StateFlow<WorkoutSessionSnapshot> = _sessionState.asStateFlow()
 
     private var lastAppliedCadence: Int = 0
     private val minuteSamples = mutableListOf<Int>()
@@ -35,14 +44,12 @@ class ActivityCoordinator(
     private var isBusy = false
 
     private val evaluationIntervalSeconds = 60L
-    private val syncIntervalSeconds = 10L
     private val fastReactionWindowSize = 8
     private val minSamplesForFastSwitch = 12
     private val fastSwitchCadenceDelta = 20
     private val switchCooldownSeconds = 20L
 
     fun startSession(user: User): Activity {
-        currentZone = null
         lastAppliedCadence = 0
         minuteSamples.clear()
         recentSamples.clear()
@@ -50,13 +57,13 @@ class ActivityCoordinator(
         lastZoneSwitchMark = null
         lastSyncMark = null
         isBusy = false
-        playlistGenerator.resetHistory()
-        playbackController.resetQueue()
+        generatePlaylist.resetHistory()
+        playbackRepository.resetQueue()
 
         val initialActivity = Activity().let { base ->
-            weatherService.lastSnapshot?.let { base.attachWeather(it) } ?: base
+            weatherRepository.currentWeather.value?.let { base.attachWeather(it) } ?: base
         }
-        activity = initialActivity
+        _sessionState.value = WorkoutSessionSnapshot(activity = initialActivity)
         cadenceMeter.start()
         return initialActivity
     }
@@ -65,9 +72,9 @@ class ActivityCoordinator(
         weather: WeatherSnapshot?,
         preferences: PlaylistPreferences? = null
     ) {
-        if (playbackController.isPlaying) return
+        if (playbackRepository.state.value.isPlaying) return
 
-        val initialTracks = playlistGenerator.pickTracks(
+        val initialTracks = generatePlaylist(
             zone = PaceZone.WALK,
             averageCadence = 110,
             weather = weather,
@@ -76,36 +83,40 @@ class ActivityCoordinator(
         )
 
         if (initialTracks.isNotEmpty()) {
-            playbackController.playBatch(initialTracks).onSuccess {
-                currentZone = PaceZone.WALK
+            playbackRepository.playBatch(initialTracks).onSuccess {
+                _sessionState.update { it.copy(currentZone = PaceZone.WALK) }
                 lastAppliedCadence = 110
                 lastZoneSwitchMark = TimeSource.Monotonic.markNow()
             }
         } else {
-            playbackController.resume()
+            playbackRepository.resume()
         }
     }
 
-    suspend fun onTick(
-        preferences: PlaylistPreferences? = null
-    ) {
-        val currentSession = activity ?: return
+    suspend fun onTick(preferences: PlaylistPreferences? = null) {
+        val currentActivity = _sessionState.value.activity ?: return
         val currentCadence = cadenceMeter.getCadence()
+        val updatedActivity = currentActivity.addSample(currentCadence)
 
-        activity = currentSession.addSample(currentCadence)
+        _sessionState.update {
+            it.copy(
+                activity = updatedActivity,
+                currentCadence = currentCadence,
+                cadenceZone = CadenceZone.fromSpm(currentCadence)
+            )
+        }
 
         if (currentCadence >= 50) {
             minuteSamples.add(currentCadence)
             recentSamples.addLast(currentCadence)
-            if (recentSamples.size > fastReactionWindowSize) {
-                recentSamples.removeFirst()
-            }
+            if (recentSamples.size > fastReactionWindowSize) recentSamples.removeFirst()
         } else if (recentSamples.isNotEmpty()) {
             recentSamples.removeFirst()
         }
 
         if (isBusy) return
 
+        val currentZone = _sessionState.value.currentZone
         val recentAvg = if (recentSamples.size >= minSamplesForFastSwitch) {
             recentSamples.average().toInt()
         } else {
@@ -141,7 +152,7 @@ class ActivityCoordinator(
                     val newZone = PaceZone.fromCadence(targetCadence, currentZone)
                     if (newZone != currentZone) {
                         val weather = fetchWeatherIfNeeded(preferences)
-                        val batch = playlistGenerator.pickTracks(
+                        val batch = generatePlaylist(
                             zone = newZone,
                             averageCadence = targetCadence,
                             weather = weather,
@@ -149,8 +160,8 @@ class ActivityCoordinator(
                             count = 3
                         )
                         if (batch.isNotEmpty()) {
-                            playbackController.playBatch(batch).onSuccess {
-                                currentZone = newZone
+                            playbackRepository.playBatch(batch).onSuccess {
+                                _sessionState.update { it.copy(currentZone = newZone) }
                                 lastAppliedCadence = targetCadence
                                 lastZoneSwitchMark = TimeSource.Monotonic.markNow()
                                 recentSamples.clear()
@@ -164,20 +175,21 @@ class ActivityCoordinator(
             return
         }
 
-        val syncInterval = if (playbackController.isRemoteConnected) 1L else 3L
+        val playbackState = playbackRepository.state.value
+        val syncInterval = if (playbackState.isRemoteConnected) 1L else 3L
         val elapsedSync = lastSyncMark?.elapsedNow()?.inWholeSeconds
         if (elapsedSync == null || elapsedSync >= syncInterval) {
             lastSyncMark = TimeSource.Monotonic.markNow()
-            playbackController.syncPlaybackState()
+            playbackRepository.syncState()
 
-            val activeZone = currentZone
-            if (activeZone != null && playbackController.remainingTrackMs <= 25_000L) {
+            val activeZone = _sessionState.value.currentZone
+            if (activeZone != null && playbackRepository.state.value.remainingMs <= 25_000L) {
                 val weather = fetchWeatherIfNeeded(preferences)
                 val fallbackCadence = recentSamples.lastOrNull()
                     ?: minuteSamples.lastOrNull()
                     ?: activeZone.minBpm
-                playbackController.enqueueNextIfNeeded {
-                    playlistGenerator.pickTracks(
+                playbackRepository.enqueueNextIfNeeded {
+                    generatePlaylist(
                         zone = activeZone,
                         averageCadence = fallbackCadence,
                         weather = weather,
@@ -192,27 +204,24 @@ class ActivityCoordinator(
     private suspend fun fetchWeatherIfNeeded(
         preferences: PlaylistPreferences?
     ): WeatherSnapshot? {
-        if (preferences?.weatherEnabled == false) return weatherService.lastSnapshot
-        val snapshot = weatherService.getWeather().getOrNull()
-        if (snapshot != null && activity?.weather != snapshot) {
-            activity = activity?.attachWeather(snapshot)
+        if (preferences?.weatherEnabled == false) return weatherRepository.currentWeather.value
+        val snapshot = weatherRepository.getWeather().getOrNull()
+        if (snapshot != null && _sessionState.value.activity?.weather != snapshot) {
+            _sessionState.update { state ->
+                state.copy(activity = state.activity?.attachWeather(snapshot))
+            }
         }
         return snapshot
     }
 
-    fun pauseSession() {
-        cadenceMeter.stop()
-    }
+    fun pauseSession() = cadenceMeter.stop()
 
-    fun resumeSession() {
-        cadenceMeter.start()
-    }
+    fun resumeSession() = cadenceMeter.start()
 
     fun endSession(): Activity? {
         cadenceMeter.stop()
-        val finished = activity?.finish()
-        activity = null
-        currentZone = null
+        val finished = _sessionState.value.activity?.finish()
+        _sessionState.value = WorkoutSessionSnapshot()
         lastAppliedCadence = 0
         minuteSamples.clear()
         recentSamples.clear()

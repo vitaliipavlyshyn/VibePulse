@@ -5,72 +5,17 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import com.vpch.vibepulse.domain.service.PlaybackController
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import com.vpch.vibepulse.domain.repository.PlaybackRepository
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
-class AndroidRunTrackerNotifier(
-    context: Context
-) : RunTrackerNotifier {
-
-    private val appContext = context.applicationContext
-    private var isServiceRunning = false
-
-    private val _finishRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    override val finishRequests: SharedFlow<Unit> = _finishRequests.asSharedFlow()
-
-    override fun onRunStarted() {
-        isServiceRunning = true
-        val intent = Intent(appContext, WorkoutForegroundService::class.java).apply {
-            action = WorkoutForegroundService.ACTION_START_OR_UPDATE
-            putExtra(WorkoutForegroundService.EXTRA_CADENCE, 0)
-            putExtra(WorkoutForegroundService.EXTRA_ELAPSED_SECONDS, 0L)
-            putExtra(WorkoutForegroundService.EXTRA_IS_PAUSED, false)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            appContext.startForegroundService(intent)
-        } else {
-            appContext.startService(intent)
-        }
-    }
-
-    override fun onRunUpdated(cadence: Int, elapsedSeconds: Long, isPaused: Boolean) {
-        if (!isServiceRunning) return
-        val intent = Intent(appContext, WorkoutForegroundService::class.java).apply {
-            action = WorkoutForegroundService.ACTION_START_OR_UPDATE
-            putExtra(WorkoutForegroundService.EXTRA_CADENCE, cadence)
-            putExtra(WorkoutForegroundService.EXTRA_ELAPSED_SECONDS, elapsedSeconds)
-            putExtra(WorkoutForegroundService.EXTRA_IS_PAUSED, isPaused)
-        }
-        appContext.startService(intent)
-    }
-
-    override fun onRunStopped() {
-        if (!isServiceRunning) return
-        isServiceRunning = false
-        val intent = Intent(appContext, WorkoutForegroundService::class.java).apply {
-            action = WorkoutForegroundService.ACTION_STOP
-        }
-        appContext.startService(intent)
-    }
-
-    override fun notifyFinishClicked() {
-        isServiceRunning = false
-        _finishRequests.tryEmit(Unit)
-    }
-}
-
 class WorkoutForegroundService : Service(), KoinComponent {
 
-    private val playbackController: PlaybackController by inject()
+    private val playbackRepository: PlaybackRepository by inject()
     private val runTrackerNotifier: RunTrackerNotifier by inject()
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -101,7 +46,7 @@ class WorkoutForegroundService : Service(), KoinComponent {
 
             ACTION_FINISH -> {
                 runTrackerNotifier.notifyFinishClicked()
-                playbackController.pauseImmediate()
+                playbackRepository.pauseImmediate()
                 stopForegroundAndSelf()
             }
 
@@ -113,9 +58,9 @@ class WorkoutForegroundService : Service(), KoinComponent {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        playbackController.pauseImmediate()
+        playbackRepository.pauseImmediate()
         Thread.sleep(250L)
-        playbackController.disconnectRemote()
+        playbackRepository.disconnectRemote()
         stopForegroundAndSelf()
         super.onTaskRemoved(rootIntent)
     }
