@@ -142,4 +142,10 @@ class AndroidSpotifyRemoteClient(
             cancel()
         }
     }
+
+
+    override suspend fun seekTo(positionMs: Long): Result<Unit> = runCatching {
+        val remote = ensureConnected()
+        remote.playerApi.seekTo(positionMs.coerceAtLeast(0L)).await()
+    }
 }

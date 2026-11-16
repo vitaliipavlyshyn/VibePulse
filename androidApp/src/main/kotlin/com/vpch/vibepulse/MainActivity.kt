@@ -14,6 +14,7 @@ import com.vpch.vibepulse.storage.TokenStorage
 import com.vpch.vibepulse.ui.VibePulseTheme
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import kotlin.jvm.java
 
 class MainActivity : ComponentActivity() {
 
@@ -24,7 +25,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleDeepLink(intent)
-
         setContent {
             VibePulseTheme {
                 AppNavigation(

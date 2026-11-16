@@ -34,7 +34,13 @@ val networkModule = module {
         )
     }
 
-    single { SpotifyConfig(clientId = BuildKonfig.SPOTIFY_CLIENT_ID) }
+    single {
+        SpotifyConfig(
+            clientId = BuildKonfig.SPOTIFY_CLIENT_ID,
+            redirectUri = BuildKonfig.SPOTIFY_REDIRECT_URI,
+            authBaseUrl = BuildKonfig.SPOTIFY_AUTH_BASE_URL
+        )
+    }
     single<TokenStorage> { SecureTokenStorage(settings = get()) }
     single {
         SpotifyAuthService(
@@ -49,7 +55,13 @@ val networkModule = module {
         )
     }
 
-    single { WeatherConfig(apiKey = BuildKonfig.OPENWEATHER_API_KEY) }
+    single {
+        WeatherConfig(
+            apiKey = BuildKonfig.OPENWEATHER_API_KEY,
+            weatherBaseUrl = BuildKonfig.OPENWEATHER_BASE_URL,
+            geoBaseUrl = BuildKonfig.OPENWEATHER_GEO_BASE_URL
+        )
+    }
     single {
         WeatherApiService(
             httpClient = get(),

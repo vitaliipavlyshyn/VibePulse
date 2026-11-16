@@ -20,6 +20,7 @@ import com.vpch.vibepulse.screens.auth.AuthScreen
 import com.vpch.vibepulse.screens.home.HomeScreen
 import com.vpch.vibepulse.screens.profile.ProfileScreen
 import com.vpch.vibepulse.screens.statistics.StatisticsScreen
+import com.vpch.vibepulse.ui.AppTheme
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
@@ -48,37 +49,23 @@ fun AppNavigation(
 
 
     Scaffold(
+        containerColor = AppTheme.colors.background,
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
-                    bottomBarItems.forEach {barItem ->
-                        NavigationBarItem(
-                            selected = currentRoute == barItem.route,
-                            onClick = {
-                                if (currentRoute != barItem.route) {
-                                    backStack.removeAll {
-                                        it is Route.Home || it is Route.Statistics || it is Route.Profile
-                                    }
-                                    if (backStack.lastOrNull() != barItem.route) {
-                                        backStack.add(barItem.route)
-                                    }
-                                }
-                            },
-                            icon = {
-                                Icon(imageVector = ImageVector.vectorResource(barItem.icon),
-                                    contentDescription = barItem.contentDescription
-                                )
-                            },
-                            label = {
-                                Text(text = stringResource(barItem.text))
+                VibePulseFloatingNavBar(
+                    currentRoute = currentRoute,
+                    onSelectRoute = { targetRoute ->
+                        if (currentRoute != targetRoute) {
+                            backStack.removeAll { it is Route.Statistics || it is Route.Profile }
+                            if (targetRoute != Route.Home) {
+                                backStack.add(targetRoute)
                             }
-                        )
+                        }
                     }
-
-                }
+                )
             }
         }
-    ) {innerPadding ->
+    ) { innerPadding ->
         NavDisplay(
             backStack = backStack,
             onBack = { backStack.removeLastOrNull() },
@@ -91,7 +78,12 @@ fun AppNavigation(
                     })
                 }
                 entry<Route.Home> {
-                    HomeScreen()
+                    HomeScreen(
+                        onSessionExpired = {
+                            backStack.clear()
+                            backStack.add(Route.Auth)
+                        }
+                    )
                 }
                 entry<Route.Statistics> {
                     StatisticsScreen()
