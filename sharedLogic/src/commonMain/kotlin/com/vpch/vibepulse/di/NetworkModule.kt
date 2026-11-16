@@ -41,7 +41,6 @@ val networkModule = module {
             authBaseUrl = BuildKonfig.SPOTIFY_AUTH_BASE_URL
         )
     }
-    single<TokenStorage> { SecureTokenStorage(settings = get()) }
     single {
         SpotifyAuthService(
             httpClient = get(),

@@ -61,14 +61,17 @@ class ActivityCoordinator(
         return initialActivity
     }
 
-    suspend fun startInitialPlayback(weather: WeatherSnapshot?) {
+    suspend fun startInitialPlayback(
+        weather: WeatherSnapshot?,
+        preferences: PlaylistPreferences? = null
+    ) {
         if (playbackController.isPlaying) return
 
         val initialTracks = playlistGenerator.pickTracks(
             zone = PaceZone.WALK,
             averageCadence = 110,
             weather = weather,
-            preferences = null,
+            preferences = preferences,
             count = 3
         )
 

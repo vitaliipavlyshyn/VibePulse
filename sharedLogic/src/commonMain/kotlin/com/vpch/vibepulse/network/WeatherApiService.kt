@@ -61,11 +61,18 @@ class WeatherApiService(
                 geo.localNames[lang] ?: geo.name
             }?.takeIf { it.isNotBlank() }
 
+
+            if (!weatherResponse.status.isSuccess()) {
+                val errorBody = runCatching { weatherResponse.body<String>() }.getOrDefault("")
+                throw Exception("Weather API (${weatherResponse.status.value}): $errorBody")
+            }
+
             if (localizedCity != null) {
                 weather.copy(cityName = localizedCity)
             } else {
                 weather
             }
+
         }
     }
 

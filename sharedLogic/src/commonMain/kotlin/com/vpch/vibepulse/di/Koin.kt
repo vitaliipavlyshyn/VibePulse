@@ -14,6 +14,7 @@ fun initKoin(config: (KoinApplication) -> Unit = {}) {
             modules(
                 networkModule,
                 domainModule,
+                storageModule,
                 viewModelModule,
                 platformModule()
             )

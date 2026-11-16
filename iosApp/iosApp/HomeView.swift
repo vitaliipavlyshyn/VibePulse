@@ -135,7 +135,6 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Success Content
 private struct HomeSuccessContent: View {
     let state: HomeUiStateSuccess
     let onIntent: (HomeIntent) -> Void
@@ -196,7 +195,6 @@ private struct HomeSuccessContent: View {
     }
 }
 
-// MARK: - 1. Header Section
 private struct HomeHeaderView: View {
     let user: User?
     let weather: WeatherSnapshot?
@@ -329,7 +327,6 @@ private struct HomeHeaderView: View {
     }
 }
 
-// MARK: - 2. Cadence Tracker Card
 private struct CadenceTrackerCardView: View {
     let runStatus: RunStatus
     let currentCadence: Int
@@ -398,7 +395,6 @@ private struct CadenceTrackerCardView: View {
     }
 }
 
-// MARK: - 3. Spotify Player Card
 private struct SpotifyPlayerCardView: View {
     let track: Track?
     let isPlaying: Bool
@@ -434,7 +430,6 @@ private struct SpotifyPlayerCardView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            // Album Art + BPM Badge
             ZStack(alignment: .topTrailing) {
                 HStack {
                     Spacer()
@@ -477,7 +472,6 @@ private struct SpotifyPlayerCardView: View {
                 }
             }
 
-            // Track Info
             VStack(spacing: 2) {
                 Text(track?.title ?? "Немає активного треку")
                     .font(.system(size: 16, weight: .bold))
@@ -491,7 +485,6 @@ private struct SpotifyPlayerCardView: View {
             }
             .padding(.horizontal, 8)
 
-            // Seek Bar + Time Labels
             VStack(spacing: 4) {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -536,7 +529,6 @@ private struct SpotifyPlayerCardView: View {
             }
             .padding(.horizontal, 6)
 
-            // Playback Controls
             HStack {
                 Button(action: onToggleLike) {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
@@ -588,7 +580,6 @@ private struct SpotifyPlayerCardView: View {
     }
 }
 
-// MARK: - 4. Workout Timer Card
 private struct WorkoutTimerCardView: View {
     let runStatus: RunStatus
     let elapsedSeconds: Int64
@@ -637,7 +628,6 @@ private struct WorkoutTimerCardView: View {
     }
 }
 
-// MARK: - 5. Run Controls Section
 private struct RunControlsSectionView: View {
     let runStatus: RunStatus
     let onStart: () -> Void

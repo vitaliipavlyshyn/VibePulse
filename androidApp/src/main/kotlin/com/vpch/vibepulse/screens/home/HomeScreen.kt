@@ -66,6 +66,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun HomeScreen(
     onSessionExpired: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
     viewModel: HomeViewModel = koinViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -75,6 +76,9 @@ fun HomeScreen(
     val permissionsToRequest = remember {
         buildList {
             add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
@@ -88,14 +92,16 @@ fun HomeScreen(
         viewModel.onIntent(HomeIntent.LocationPermissionUpdated(locationGranted))
     }
 
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        val successState = uiState as? HomeUiState.Success
-        if (successState != null &&
-            successState.weather == null &&
-            successState.hasLocationPermission &&
-            isSystemLocationEnabled(context)
-        ) {
-            viewModel.onIntent(HomeIntent.RefreshWeather)
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val hasActivityPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            if (!hasActivityPermission) {
+                permissionLauncher.launch(permissionsToRequest)
+            }
         }
     }
 
@@ -125,7 +131,8 @@ fun HomeScreen(
         HomeContent(
             uiState = uiState,
             onIntent = viewModel::onIntent,
-            onRequestPermissions = { permissionLauncher.launch(permissionsToRequest) }
+            onRequestPermissions = { permissionLauncher.launch(permissionsToRequest) },
+            onNavigateToProfile = onNavigateToProfile
         )
 
         SnackbarHost(
@@ -141,6 +148,7 @@ fun HomeContent(
     uiState: HomeUiState,
     onIntent: (HomeIntent) -> Unit,
     onRequestPermissions: () -> Unit,
+    onNavigateToProfile: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     when (uiState) {
@@ -202,7 +210,8 @@ fun HomeContent(
                         hasLocationPermission = uiState.hasLocationPermission,
                         isLocationEnabled = uiState.isLocationEnabled,
                         onRefreshWeather = { onIntent(HomeIntent.RefreshWeather) },
-                        onRequestLocation = onRequestPermissions
+                        onRequestLocation = onRequestPermissions,
+                        onProfileClick = onNavigateToProfile
                     )
 
                     CadenceTrackerCard(

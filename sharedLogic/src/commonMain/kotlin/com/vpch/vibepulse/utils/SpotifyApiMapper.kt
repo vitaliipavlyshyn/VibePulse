@@ -23,7 +23,8 @@ fun TrackDto.toDomain(): Track {
         title = name,
         artist = artists.joinToString(", ") { it.name },
         albumArtUrl = album?.images?.firstOrNull()?.url,
-        durationMs = durationMs
+        durationMs = durationMs,
+        isExplicit = explicit
     )
 }
 

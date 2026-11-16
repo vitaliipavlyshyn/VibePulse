@@ -62,5 +62,22 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    flavorDimensions += "tier"
+    productFlavors {
+        create("free") {
+            dimension = "tier"
+            applicationIdSuffix = ".free"
+            versionNameSuffix = "-free"
+            buildConfigField("boolean", "IS_PREMIUM_TIER", "false")
+        }
+        create("premium") {
+            dimension = "tier"
+            applicationIdSuffix = ".premium"
+            versionNameSuffix = "-premium"
+            buildConfigField("boolean", "IS_PREMIUM_TIER", "true")
+        }
     }
 }

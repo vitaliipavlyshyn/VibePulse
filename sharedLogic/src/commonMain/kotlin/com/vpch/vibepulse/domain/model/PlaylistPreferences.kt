@@ -3,29 +3,49 @@ package com.vpch.vibepulse.domain.model
 data class PlaylistPreferences(
     val weatherEnabled: Boolean = true,
     val genres: List<String> = emptyList(),
-    val excludedArtists: List<String> = emptyList()
+    val excludeRemixesAndCovers: Boolean = false,
+    val excludeExplicit: Boolean = false
 ) {
-    fun setWeatherEnabled(enabled: Boolean): PlaylistPreferences =
-        copy(weatherEnabled = enabled)
-
-    fun addGenre(genre: String): PlaylistPreferences =
-        if (genre.isBlank() || genres.any { it.equals(genre, ignoreCase = true) }) this
-        else copy(genres = genres + genre.trim())
-
-    fun removeGenre(genre: String): PlaylistPreferences =
-        copy(genres = genres.filterNot { it.equals(genre, ignoreCase = true) })
-
-    fun excludeArtist(artist: String): PlaylistPreferences =
-        if (artist.isBlank() || excludedArtists.any { it.equals(artist, ignoreCase = true) }) this
-        else copy(excludedArtists = excludedArtists + artist.trim())
-
-    fun allowArtist(artist: String): PlaylistPreferences =
-        copy(excludedArtists = excludedArtists.filterNot { it.equals(artist, ignoreCase = true) })
+    fun toggleGenre(genre: String): PlaylistPreferences {
+        val exists = genres.any { it.equals(genre, ignoreCase = true) }
+        return if (exists) {
+            copy(genres = genres.filterNot { it.equals(genre, ignoreCase = true) })
+        } else {
+            copy(genres = genres + genre.trim())
+        }
+    }
 
     fun isTrackAllowed(track: Track): Boolean {
-        if (excludedArtists.isEmpty()) return true
-        return excludedArtists.none { excluded ->
-            track.artist.contains(excluded, ignoreCase = true)
+        if (excludeExplicit && track.isExplicit) {
+            return false
         }
+
+        if (excludeRemixesAndCovers) {
+            val titleLower = track.title.lowercase()
+            val blockedMarkers = listOf(
+                "remix", "cover", "acoustic", "live", "version",
+                "sped up", "slowed", "reverb", "nightcore", "karaoke",
+                "instrumental", "tribute", "piano version"
+            )
+            if (blockedMarkers.any { titleLower.contains(it) }) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    companion object {
+        val AVAILABLE_GENRES = listOf(
+            "Pop",
+            "Hip-Hop",
+            "Rock",
+            "Dance",
+            "Electronic",
+            "House",
+            "Indie",
+            "Drum & Bass",
+            "R&B"
+        )
     }
 }

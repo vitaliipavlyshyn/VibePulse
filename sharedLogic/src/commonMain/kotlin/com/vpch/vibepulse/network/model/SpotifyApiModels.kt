@@ -47,8 +47,8 @@ data class TrackDto(
     @SerialName("duration_ms") val durationMs: Long,
     @SerialName("artists") val artists: List<ArtistDto> = emptyList(),
     @SerialName("album") val album: AlbumDto? = null,
-    @SerialName("is_playable")
-    val isPlayable: Boolean = true
+    @SerialName("is_playable") val isPlayable: Boolean = true,
+    @SerialName("explicit") val explicit: Boolean = false
 )
 
 @Serializable

@@ -20,10 +20,7 @@ class PlaylistGenerator(
     private val playedUris = mutableSetOf<String>()
 
     private val spamKeywords = listOf(
-        "workout", "running", "jogging", "bpm", "karaoke",
-        "tribute", "ringtone", "sleep", "white noise", "lullaby",
-        "sped up", "slowed", "reverb", "nightcore", "8d audio",
-        "instrumental", "cover", "lo-fi", "lofi", "beats", "piano version"
+        "ringtone", "white noise", "lullaby", "8d audio"
     )
 
     private data class Candidate(

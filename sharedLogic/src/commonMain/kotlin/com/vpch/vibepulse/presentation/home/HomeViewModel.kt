@@ -12,6 +12,7 @@ import com.vpch.vibepulse.location.LocationDisabledException
 import com.vpch.vibepulse.location.LocationProvider
 import com.vpch.vibepulse.network.SpotifyApiService
 import com.vpch.vibepulse.service.RunTrackerNotifier
+import com.vpch.vibepulse.storage.PlaylistPreferencesStore
 import com.vpch.vibepulse.storage.TokenStorage
 import com.vpch.vibepulse.utils.toDomain
 import kotlinx.coroutines.CoroutineScope
@@ -70,7 +71,8 @@ class HomeViewModel(
     private val locationProvider: LocationProvider,
     private val activityCoordinator: ActivityCoordinator,
     private val tokenStorage: TokenStorage,
-    private val runTrackerNotifier: RunTrackerNotifier
+    private val runTrackerNotifier: RunTrackerNotifier,
+    private val preferencesStore: PlaylistPreferencesStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -264,7 +266,9 @@ class HomeViewModel(
         startTimer()
 
         viewModelScope.launch {
-            activityCoordinator.startInitialPlayback(currentState.weather)
+            activityCoordinator.startInitialPlayback(
+                weather = currentState.weather,
+               preferences = preferencesStore.preferences.value)
             syncPlayerUi()
         }
     }
@@ -346,7 +350,9 @@ class HomeViewModel(
         timerJob = viewModelScope.launch {
             while (isActive) {
                 delay(1000.milliseconds)
-                activityCoordinator.onTick()
+                activityCoordinator.onTick(
+                    preferences = preferencesStore.preferences.value
+                )
 
                 val controller = activityCoordinator.playbackController
                 updateSuccessState { state ->

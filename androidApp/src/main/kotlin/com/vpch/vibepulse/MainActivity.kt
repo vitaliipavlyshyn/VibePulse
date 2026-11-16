@@ -7,10 +7,14 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.vpch.vibepulse.presentation.auth.AuthIntent
 import com.vpch.vibepulse.presentation.auth.AuthViewModel
 import com.vpch.vibepulse.screens.navigation.AppNavigation
 import com.vpch.vibepulse.storage.TokenStorage
+import com.vpch.vibepulse.ui.AppThemeMode
+import com.vpch.vibepulse.ui.ThemeRepositoryImpl
 import com.vpch.vibepulse.ui.VibePulseTheme
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
@@ -20,13 +24,18 @@ class MainActivity : ComponentActivity() {
 
     private val authViewModel: AuthViewModel by viewModel()
     private val tokenStorage: TokenStorage by inject()
+    private val themeRepository: ThemeRepositoryImpl by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         handleDeepLink(intent)
         setContent {
-            VibePulseTheme {
+            val themeMode: AppThemeMode by themeRepository.themeMode.collectAsState(
+                initial = AppThemeMode.SYSTEM
+            )
+
+            VibePulseTheme(themeMode = themeMode) {
                 AppNavigation(
                     isUserLogged = tokenStorage.hasSession()
                 )
