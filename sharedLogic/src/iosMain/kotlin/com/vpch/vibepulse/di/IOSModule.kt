@@ -5,6 +5,7 @@ import com.russhwolf.settings.KeychainSettings
 import com.russhwolf.settings.Settings
 import com.vpch.vibepulse.location.IosLocationProvider
 import com.vpch.vibepulse.location.LocationProvider
+import com.vpch.vibepulse.player.IosSpotifyRemoteClient
 import com.vpch.vibepulse.player.RemotePlaybackState
 import com.vpch.vibepulse.player.SpotifyRemoteClient
 import com.vpch.vibepulse.sensor.CadenceMeter
@@ -24,37 +25,8 @@ val iosModule = module {
     single<LocationProvider> { IosLocationProvider() }
     single<CadenceMeter> { IosCadenceMeter() }
 
-    single<SpotifyRemoteClient> {
-        object : SpotifyRemoteClient {
-            override val isConnected: Boolean = false
-            override val playbackState: StateFlow<RemotePlaybackState?> = MutableStateFlow(null)
-
-            override suspend fun connect(): Result<Unit> =
-                Result.failure(UnsupportedOperationException("iOS SDK not linked yet"))
-
-            override fun disconnect() = Unit
-
-            override suspend fun play(uri: String): Result<Unit> =
-                Result.failure(UnsupportedOperationException())
-
-            override suspend fun queue(uri: String): Result<Unit> =
-                Result.failure(UnsupportedOperationException())
-
-            override suspend fun pause(): Result<Unit> =
-                Result.failure(UnsupportedOperationException())
-
-            override fun pauseImmediate() = Unit
-
-            override suspend fun resume(): Result<Unit> =
-                Result.failure(UnsupportedOperationException())
-
-            override suspend fun skipNext(): Result<Unit> =
-                Result.failure(UnsupportedOperationException())
-
-            override suspend fun seekTo(positionMs: Long): Result<Unit> =
-                Result.failure(UnsupportedOperationException())
-        }
-    }
+    single { IosSpotifyRemoteClient(config = get()) }
+    single<SpotifyRemoteClient> { get<IosSpotifyRemoteClient>() }
 
     single<RunTrackerNotifier> { NoOpRunTrackerNotifier() }
 }

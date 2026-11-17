@@ -7,12 +7,29 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		755C09AF30AC646C00C6CA0D /* SpotifyiOS.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 755C09AE30AC646C00C6CA0D /* SpotifyiOS.xcframework */; };
+		755C09B030AC646C00C6CA0D /* SpotifyiOS.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 755C09AE30AC646C00C6CA0D /* SpotifyiOS.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		75B769FF30A351B300714295 /* inter_variablefont_opsz_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 75B769FA30A351B300714295 /* inter_variablefont_opsz_wght.ttf */; };
 		75B76A0330A3521C00714295 /* manrope_variablefont_wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 75B76A0230A3521C00714295 /* manrope_variablefont_wght.ttf */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		755C09B130AC646C00C6CA0D /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				755C09B030AC646C00C6CA0D /* SpotifyiOS.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		1604FA2D1FDC64CCA0513108 /* VibePulse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VibePulse.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		755C09AE30AC646C00C6CA0D /* SpotifyiOS.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SpotifyiOS.xcframework; path = "../../../../../../Volumes/SSD 1TB/Downloads/ios-sdk-5.0.1/SpotifyiOS.xcframework"; sourceTree = "<group>"; };
 		75B769FA30A351B300714295 /* inter_variablefont_opsz_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = inter_variablefont_opsz_wght.ttf; sourceTree = "<group>"; };
 		75B76A0230A3521C00714295 /* manrope_variablefont_wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = manrope_variablefont_wght.ttf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -56,6 +73,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				755C09AF30AC646C00C6CA0D /* SpotifyiOS.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -70,6 +88,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		755C09AD30AC646C00C6CA0D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				755C09AE30AC646C00C6CA0D /* SpotifyiOS.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		7E52AC9D54B1FEE8DE95DD68 = {
 			isa = PBXGroup;
 			children = (
@@ -77,6 +103,7 @@
 				3ED039E2708580E668C94111 /* iosApp */,
 				75B769FA30A351B300714295 /* inter_variablefont_opsz_wght.ttf */,
 				75B76A0230A3521C00714295 /* manrope_variablefont_wght.ttf */,
+				755C09AD30AC646C00C6CA0D /* Frameworks */,
 				3B4C054576504B9C55C37467 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -92,6 +119,7 @@
 				273CC3AB2992E66A6DC4856A /* Sources */,
 				BDDFB891543FAF99A7838DBB /* Frameworks */,
 				562F518D351125845BF879BC /* Resources */,
+				755C09B130AC646C00C6CA0D /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -257,6 +285,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "VibePulse використовує вашу приблизну локацію для визначення поточної погоди та підбору музики під темп пробіжки.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "VibePulse використовує датчики руху для вимірювання вашого каденсу під час бігу та синхронізації темпу музики.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -350,6 +380,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "VibePulse використовує вашу приблизну локацію для визначення поточної погоди та підбору музики під темп пробіжки.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "VibePulse використовує датчики руху для вимірювання вашого каденсу під час бігу та синхронізації темпу музики.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

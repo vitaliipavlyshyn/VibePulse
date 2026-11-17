@@ -1,34 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-    <dict>
-        <key>CADisableMinimumFrameDurationOnPhone</key>
-        <true/>
-        <key>CFBundleURLTypes</key>
-        <array>
-            <dict>
-                <key>CFBundleTypeRole</key>
-                <string>Editor</string>
-                <key>CFBundleURLName</key>
-                <string>com.vpch.vibepulse</string>
-                <key>CFBundleURLSchemes</key>
-                <array>
-                    <string>vibepulse</string>
-                </array>
-            </dict>
-        </array>
-        <key>NSLocationWhenInUseUsageDescription</key>
-        <string>VibePulse використовує вашу приблизну локацію для визначення поточної погоди та підбору музики під темп пробіжки.</string>
-        <key>NSMotionUsageDescription</key>
-        <string>VibePulse використовує датчики руху для вимірювання вашого каденсу під час бігу та синхронізації темпу музики.</string>
-        <key>LSApplicationQueriesSchemes</key>
-        <array>
-            <string>spotify</string>
-        </array>
-        <key>UIAppFonts</key>
-        <array>
-            <string>inter_variablefont_opsz_wght.ttf</string>
-            <string>manrope_variablefont_wght.ttf</string>
-        </array>
-    </dict>
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.vpch.vibepulse</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vibepulse</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vibepulse</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>spotify</string>
+	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>inter_variablefont_opsz_wght.ttf</string>
+		<string>manrope_variablefont_wght.ttf</string>
+	</array>
+</dict>
 </plist>
