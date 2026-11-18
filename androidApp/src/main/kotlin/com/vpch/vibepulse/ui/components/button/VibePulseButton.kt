@@ -1,4 +1,4 @@
-package com.vpch.vibepulse.ui.components
+package com.vpch.vibepulse.ui.components.button
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
