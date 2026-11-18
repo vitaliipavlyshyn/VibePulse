@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.vpch.vibepulse.screens.profile
 
 import androidx.compose.foundation.layout.Arrangement
@@ -14,9 +16,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vpch.vibepulse.domain.model.PlaylistPreferences
+import com.vpch.vibepulse.domain.model.User
+import com.vpch.vibepulse.domain.model.UserTier
 import com.vpch.vibepulse.presentation.profile.ProfileEffect
 import com.vpch.vibepulse.presentation.profile.ProfileUiState
 import com.vpch.vibepulse.presentation.profile.ProfileViewModel
@@ -28,6 +34,7 @@ import com.vpch.vibepulse.screens.profile.components.ProfileHeaderSection
 import com.vpch.vibepulse.screens.profile.components.ThemeSelectionCard
 import com.vpch.vibepulse.ui.AppThemeMode
 import com.vpch.vibepulse.ui.ThemeRepositoryImpl
+import com.vpch.vibepulse.ui.components.VibePulsePreview
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -81,13 +88,13 @@ fun ProfileScreen(
 private fun ProfileContent(
     uiState: ProfileUiState,
     themeMode: AppThemeMode,
-    bottomPadding: Dp,
-    onSelectTheme: (AppThemeMode) -> Unit,
-    onToggleGenre: (String) -> Unit,
-    onWeatherToggle: (Boolean) -> Unit,
-    onExcludeRemixesToggle: (Boolean) -> Unit,
-    onExcludeExplicitToggle: (Boolean) -> Unit,
-    onLogoutClick: () -> Unit
+    bottomPadding: Dp = 0.dp,
+    onSelectTheme: (AppThemeMode) -> Unit = {},
+    onToggleGenre: (String) -> Unit = {},
+    onWeatherToggle: (Boolean) -> Unit = {},
+    onExcludeRemixesToggle: (Boolean) -> Unit = {},
+    onExcludeExplicitToggle: (Boolean) -> Unit = {},
+    onLogoutClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -104,11 +111,11 @@ private fun ProfileContent(
         ProfileHeaderSection(
             displayName = uiState.user?.displayName,
             avatarUrl = uiState.user?.avatarUrl,
-            isPremium = uiState.isPremium
+            tier = uiState.tier
         )
 
         MusicPreferencesCard(
-            isPremium = uiState.isPremium,
+            tier = uiState.tier,
             preferences = uiState.preferences,
             onToggleGenre = onToggleGenre,
             onWeatherToggle = onWeatherToggle,
@@ -123,4 +130,20 @@ private fun ProfileContent(
 
         LogoutButton(onClick = onLogoutClick)
     }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProfileScreenPreview() = VibePulsePreview(padding = 0.dp) {
+    ProfileContent(
+        uiState = ProfileUiState(
+            user = User(spotifyId = "vitalii_123", displayName = "Віталій", hasPremium = true),
+            tier = UserTier.PREMIUM,
+            preferences = PlaylistPreferences(
+                genres = setOf("pop", "electronic") as List<String>,
+                weatherEnabled = true
+            )
+        ),
+        themeMode = AppThemeMode.SYSTEM
+    )
 }

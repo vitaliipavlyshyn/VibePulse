@@ -38,11 +38,11 @@ import com.vpch.vibepulse.R
 import com.vpch.vibepulse.presentation.home.RunStatus
 import com.vpch.vibepulse.ui.AppTheme
 import com.vpch.vibepulse.ui.VibePulseTheme
-import com.vpch.vibepulse.ui.components.VibePulseButton
+import com.vpch.vibepulse.ui.components.button.VibePulseButton
 import com.vpch.vibepulse.ui.components.text.BodyText
 
 @Composable
-fun RunControlsSection(
+internal fun RunControlsSection(
     runStatus: RunStatus,
     onStart: () -> Unit,
     onPause: () -> Unit,
@@ -53,7 +53,7 @@ fun RunControlsSection(
     val isPaused = runStatus == RunStatus.PAUSED
 
     val finishHorizontalPadding by animateDpAsState(
-        targetValue = if (isPaused) 16.dp else 22.dp,
+        targetValue = if (isPaused) HomeDefaults.FinishPaddingPaused else HomeDefaults.FinishPaddingRunning,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness = Spring.StiffnessMediumLow
@@ -76,13 +76,13 @@ fun RunControlsSection(
             shape = CircleShape,
             modifier = Modifier
                 .weight(1f)
-                .height(50.dp)
+                .height(HomeDefaults.ControlButtonHeight)
         ) {
             AnimatedContent(
                 targetState = runStatus,
                 transitionSpec = {
-                    (fadeIn(tween(200)) + expandHorizontally(expandFrom = Alignment.CenterHorizontally))
-                        .togetherWith(fadeOut(tween(150)))
+                    (fadeIn(tween(HomeDefaults.ButtonFadeInDurationMs)) + expandHorizontally(expandFrom = Alignment.CenterHorizontally))
+                        .togetherWith(fadeOut(tween(HomeDefaults.ButtonFadeOutDurationMs)))
                 },
                 label = "primaryRunButtonContent"
             ) { state ->
@@ -94,7 +94,7 @@ fun RunControlsSection(
                         Icon(
                             imageVector = ImageVector.vectorResource(R.drawable.play_arrow),
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(HomeDefaults.ControlIconSize)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
@@ -116,30 +116,30 @@ fun RunControlsSection(
 
         AnimatedVisibility(
             visible = isActive,
-            enter = fadeIn(tween(220)) + expandHorizontally(
+            enter = fadeIn(tween(HomeDefaults.FinishEnterDurationMs)) + expandHorizontally(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioLowBouncy,
                     stiffness = Spring.StiffnessMediumLow
                 ),
                 expandFrom = Alignment.Start
             ),
-            exit = fadeOut(tween(160)) + shrinkHorizontally(
-                animationSpec = tween(220),
+            exit = fadeOut(tween(HomeDefaults.FinishExitDurationMs)) + shrinkHorizontally(
+                animationSpec = tween(HomeDefaults.FinishEnterDurationMs),
                 shrinkTowards = Alignment.Start
             )
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(HomeDefaults.SectionSpacing))
 
                 Surface(
                     onClick = onFinish,
                     shape = CircleShape,
                     color = AppTheme.colors.buttonPrimary,
                     border = BorderStroke(
-                        width = 1.5.dp,
+                        width = HomeDefaults.CardBorderWidth,
                         color = AppTheme.colors.indicator.copy(alpha = 0.5f)
                     ),
-                    modifier = Modifier.height(50.dp)
+                    modifier = Modifier.height(HomeDefaults.ControlButtonHeight)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = finishHorizontalPadding),
@@ -148,9 +148,9 @@ fun RunControlsSection(
                     ) {
                         Icon(
                             imageVector = ImageVector.vectorResource(R.drawable.flag),
-                            contentDescription = "flag",
+                            contentDescription = null,
                             tint = AppTheme.colors.indicator,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(HomeDefaults.FinishFlagIconSize)
                         )
                         BodyText(
                             text = stringResource(R.string.finish),
@@ -169,36 +169,17 @@ fun RunControlsSection(
 
 @PreviewLightDark
 @Composable
-fun RunControlsSectionPreview() {
+private fun RunControlsSectionPreview() {
     VibePulseTheme {
         Surface(
             color = AppTheme.colors.background,
             modifier = Modifier.padding(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                RunControlsSection(
-                    runStatus = RunStatus.IDLE,
-                    onStart = {},
-                    onPause = {},
-                    onResume = {},
-                    onFinish = {}
-                )
-                RunControlsSection(
-                    runStatus = RunStatus.RUNNING,
-                    onStart = {},
-                    onPause = {},
-                    onResume = {},
-                    onFinish = {}
-                )
-                RunControlsSection(
-                    runStatus = RunStatus.PAUSED,
-                    onStart = {},
-                    onPause = {},
-                    onResume = {},
-                    onFinish = {}
-                )
+                RunControlsSection(runStatus = RunStatus.IDLE, onStart = {}, onPause = {}, onResume = {}, onFinish = {})
+                RunControlsSection(runStatus = RunStatus.RUNNING, onStart = {}, onPause = {}, onResume = {}, onFinish = {})
+                RunControlsSection(runStatus = RunStatus.PAUSED, onStart = {}, onPause = {}, onResume = {}, onFinish = {})
             }
         }
     }
 }
-

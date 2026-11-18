@@ -63,8 +63,8 @@ fun AppNavigation(
                         .background(
                             Brush.verticalGradient(
                                 0.0f to Color.Transparent,
-                                0.35f to AppTheme.colors.background.copy(alpha = 0.78f),
-                                1.0f to AppTheme.colors.background.copy(alpha = 0.94f)
+                                0.55f to AppTheme.colors.background.copy(alpha = 0.65f),
+                                1.0f to AppTheme.colors.background.copy(alpha = 0.88f)
                             )
                         )
                 ) {
@@ -104,7 +104,9 @@ fun AppNavigation(
                 }
                 entry<Route.Statistics> {
                     Box(modifier = Modifier.padding(bottom = bottomInset)) {
-                        StatisticsScreen()
+                        StatisticsScreen(
+                            bottomPadding = bottomInset
+                        )
                     }
                 }
                 entry<Route.Profile> {

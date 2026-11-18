@@ -13,9 +13,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.vpch.vibepulse.R
 import com.vpch.vibepulse.ui.AppTheme
+import com.vpch.vibepulse.ui.components.VibePulsePreview
 import com.vpch.vibepulse.ui.components.text.BodyText
 import com.vpch.vibepulse.ui.components.text.TitleText
 
@@ -88,4 +90,10 @@ internal fun LogoutConfirmationDialog(
             }
         }
     )
+}
+
+@PreviewLightDark
+@Composable
+private fun LogoutButtonPreview() = VibePulsePreview {
+    LogoutButton(onClick = {})
 }

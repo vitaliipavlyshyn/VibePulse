@@ -1,10 +1,8 @@
 package com.vpch.vibepulse.screens.home
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
-import android.location.LocationManager
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,33 +14,23 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularWavyProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import androidx.core.location.LocationManagerCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vpch.vibepulse.R
 import com.vpch.vibepulse.domain.model.Track
@@ -57,13 +45,14 @@ import com.vpch.vibepulse.presentation.home.RunStatus
 import com.vpch.vibepulse.presentation.home.RunUiState
 import com.vpch.vibepulse.presentation.home.WeatherUiState
 import com.vpch.vibepulse.screens.home.components.CadenceTrackerCard
+import com.vpch.vibepulse.screens.home.components.HomeDefaults
 import com.vpch.vibepulse.screens.home.components.HomeHeaderSection
 import com.vpch.vibepulse.screens.home.components.RunControlsSection
 import com.vpch.vibepulse.screens.home.components.SpotifyPlayerCard
 import com.vpch.vibepulse.screens.home.components.WorkoutTimerCard
 import com.vpch.vibepulse.ui.AppTheme
-import com.vpch.vibepulse.ui.AppThemeMode
 import com.vpch.vibepulse.ui.VibePulseTheme
+import com.vpch.vibepulse.ui.components.ErrorStateView
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -96,36 +85,20 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val hasActivityPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACTIVITY_RECOGNITION
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-            if (!hasActivityPermission) {
-                permissionLauncher.launch(permissionsToRequest)
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(permissionsToRequest)
         }
     }
 
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                HomeEffect.RequestLocationPermission -> {
-                    permissionLauncher.launch(permissionsToRequest)
-                }
-
-                HomeEffect.OpenLocationSettings -> {
-                    context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-                }
-
-                HomeEffect.NavigateToAuth -> {
-                    onSessionExpired()
-                }
-
-                is HomeEffect.ShowMessage -> {
-                    snackbarHostState.showSnackbar(effect.message)
-                }
+                HomeEffect.RequestLocationPermission -> permissionLauncher.launch(permissionsToRequest)
+                HomeEffect.OpenLocationSettings -> context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                HomeEffect.NavigateToAuth -> onSessionExpired()
+                is HomeEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
             }
         }
     }
@@ -146,65 +119,46 @@ fun HomeScreen(
         )
     }
 }
+
 @Composable
 fun HomeContent(
     uiState: HomeUiState,
     onIntent: (HomeIntent) -> Unit,
     onRequestPermissions: () -> Unit,
-    onNavigateToProfile: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToProfile: () -> Unit = {}
 ) {
     when (uiState) {
         HomeUiState.Loading -> {
-            Box(
-                modifier = modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularWavyProgressIndicator()
             }
         }
 
         is HomeUiState.Error -> {
-            Column(
+            ErrorStateView(
+                message = uiState.message,
+                onRetry = { onIntent(HomeIntent.LoadInitialData) },
+                secondaryActionLabel = stringResource(R.string.home_relogin),
+                onSecondaryAction = { onIntent(HomeIntent.LogoutClicked) },
                 modifier = modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = uiState.message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.error,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { onIntent(HomeIntent.LoadInitialData) }) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(R.drawable.refresh),
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Спробувати знову")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(onClick = { onIntent(HomeIntent.LogoutClicked) }) {
-                    Text("Увійти знову")
-                }
-            }
+            )
         }
 
         is HomeUiState.Success -> {
             Column(
                 modifier = modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(
+                        horizontal = HomeDefaults.ScreenHorizontalPadding,
+                        vertical = HomeDefaults.ScreenVerticalPadding
+                    )
             ) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(HomeDefaults.SectionSpacing)
                 ) {
                     HomeHeaderSection(
                         user = uiState.user,
@@ -241,7 +195,7 @@ fun HomeContent(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(HomeDefaults.SectionSpacing))
 
                 RunControlsSection(
                     runStatus = uiState.run.status,
@@ -255,33 +209,20 @@ fun HomeContent(
     }
 }
 
-
-@Preview(showBackground = true, name = "Home - Running (Light)")
+@PreviewLightDark
 @Composable
-fun HomeScreenRunningPreview() {
-    VibePulseTheme(themeMode = AppThemeMode.LIGHT) {
+private fun HomeScreenPreview() {
+    VibePulseTheme {
         Surface(color = AppTheme.colors.background) {
             HomeContent(
                 uiState = HomeUiState.Success(
-                    user = User(
-                        spotifyId = "vitalii_123",
-                        displayName = "Віталій",
-                        hasPremium = true
-                    ),
+                    user = User(spotifyId = "vitalii_123", displayName = "Віталій", hasPremium = true),
                     weather = WeatherUiState(
-                        snapshot = WeatherSnapshot(
-                            temperature = 18.4,
-                            condition = "Ясно",
-                            area = "Львів"
-                        ),
+                        snapshot = WeatherSnapshot(temperature = 18.4, condition = "Ясно", area = "Львів"),
                         hasPermission = true,
                         isLocationEnabled = true
                     ),
-                    run = RunUiState(
-                        status = RunStatus.RUNNING,
-                        currentCadence = 168,
-                        elapsedSeconds = 845L
-                    ),
+                    run = RunUiState(status = RunStatus.RUNNING, currentCadence = 168, elapsedSeconds = 845L),
                     player = PlayerUiState(
                         currentTrack = Track(
                             spotifyUri = "spotify:track:123",
@@ -303,30 +244,3 @@ fun HomeScreenRunningPreview() {
         }
     }
 }
-
-@Preview(
-    showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_YES,
-    name = "Home - Idle (Dark)"
-)
-@Composable
-fun HomeScreenIdleDarkPreview() {
-    VibePulseTheme(themeMode = AppThemeMode.DARK) {
-        Surface(color = AppTheme.colors.background) {
-            HomeContent(
-                uiState = HomeUiState.Success(
-                    user = User(
-                        spotifyId = "vitalii_123",
-                        displayName = "Віталій",
-                        hasPremium = false
-                    ),
-                    weather = WeatherUiState(hasPermission = false)
-                ),
-                onIntent = {},
-                onRequestPermissions = {}
-            )
-        }
-    }
-}
-
-

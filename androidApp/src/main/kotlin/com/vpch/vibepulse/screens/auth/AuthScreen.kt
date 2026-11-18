@@ -2,15 +2,11 @@ package com.vpch.vibepulse.screens.auth
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,7 +25,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -44,9 +39,8 @@ import com.vpch.vibepulse.presentation.auth.AuthViewModel
 import com.vpch.vibepulse.ui.AppTheme
 import com.vpch.vibepulse.ui.VibePulseTheme
 import com.vpch.vibepulse.ui.components.AppErrorDialog
-import com.vpch.vibepulse.ui.components.VibePulseButton
+import com.vpch.vibepulse.ui.components.button.VibePulseButton
 import com.vpch.vibepulse.ui.components.text.BodyText
-import com.vpch.vibepulse.ui.components.text.TitleText
 import org.koin.compose.viewmodel.koinViewModel
 
 
