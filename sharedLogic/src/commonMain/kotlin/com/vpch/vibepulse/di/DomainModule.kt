@@ -3,10 +3,10 @@ package com.vpch.vibepulse.di
 import com.vpch.vibepulse.data.playback.PlaybackRepositoryImpl
 import com.vpch.vibepulse.data.playback.RemotePlaybackGateway
 import com.vpch.vibepulse.data.playback.WebApiPlaybackGateway
-import com.vpch.vibepulse.data.repository.AuthRepositoryImpl
-import com.vpch.vibepulse.data.repository.TrackRepositoryImpl
-import com.vpch.vibepulse.data.repository.UserRepositoryImpl
-import com.vpch.vibepulse.data.repository.WeatherRepositoryImpl
+import com.vpch.vibepulse.data.repository.remote.AuthRepositoryImpl
+import com.vpch.vibepulse.data.repository.remote.TrackRepositoryImpl
+import com.vpch.vibepulse.data.repository.remote.UserRepositoryImpl
+import com.vpch.vibepulse.data.repository.remote.WeatherRepositoryImpl
 import com.vpch.vibepulse.domain.coordinator.ActivityCoordinator
 import com.vpch.vibepulse.domain.repository.AuthRepository
 import com.vpch.vibepulse.domain.repository.PlaybackRepository
@@ -15,7 +15,10 @@ import com.vpch.vibepulse.domain.repository.UserRepository
 import com.vpch.vibepulse.domain.repository.WeatherRepository
 import com.vpch.vibepulse.domain.service.TrackScoringEngine
 import com.vpch.vibepulse.domain.usecase.GenerateWorkoutPlaylistUseCase
+import com.vpch.vibepulse.domain.usecase.GetActivityDetailsUseCase
+import com.vpch.vibepulse.domain.usecase.GetStatisticsSummaryUseCase
 import com.vpch.vibepulse.domain.usecase.LogoutUseCase
+import com.vpch.vibepulse.domain.usecase.SaveActivityUseCase
 import com.vpch.vibepulse.domain.usecase.ToggleTrackLikeUseCase
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.singleOf
@@ -40,6 +43,10 @@ val domainModule = module {
     factoryOf(::GenerateWorkoutPlaylistUseCase)
     factoryOf(::ToggleTrackLikeUseCase)
     factoryOf(::LogoutUseCase)
+    factoryOf (::SaveActivityUseCase )
+    factoryOf (::GetStatisticsSummaryUseCase )
+    factoryOf (::GetActivityDetailsUseCase )
+
 
     singleOf(::ActivityCoordinator)
 }

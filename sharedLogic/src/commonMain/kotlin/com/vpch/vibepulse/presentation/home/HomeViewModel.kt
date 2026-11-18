@@ -3,14 +3,17 @@ package com.vpch.vibepulse.presentation.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vpch.vibepulse.domain.coordinator.ActivityCoordinator
+import com.vpch.vibepulse.domain.model.ActivityTrack
 import com.vpch.vibepulse.domain.model.Track
 import com.vpch.vibepulse.domain.model.User
+import com.vpch.vibepulse.domain.repository.LocalUserRepository
 import com.vpch.vibepulse.domain.repository.PlaybackRepository
 import com.vpch.vibepulse.domain.repository.PreferencesRepository
 import com.vpch.vibepulse.domain.repository.TrackRepository
 import com.vpch.vibepulse.domain.repository.UserRepository
 import com.vpch.vibepulse.domain.repository.WeatherRepository
 import com.vpch.vibepulse.domain.usecase.LogoutUseCase
+import com.vpch.vibepulse.domain.usecase.SaveActivityUseCase
 import com.vpch.vibepulse.domain.usecase.ToggleTrackLikeUseCase
 import com.vpch.vibepulse.location.LocationDisabledException
 import com.vpch.vibepulse.location.LocationProvider
@@ -34,6 +37,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class HomeViewModel(
     private val userRepository: UserRepository,
+    private val localUserRepository: LocalUserRepository,
     private val weatherRepository: WeatherRepository,
     private val trackRepository: TrackRepository,
     private val playbackRepository: PlaybackRepository,
@@ -42,6 +46,7 @@ class HomeViewModel(
     private val locationProvider: LocationProvider,
     private val runTrackerNotifier: RunTrackerNotifier,
     private val toggleTrackLike: ToggleTrackLikeUseCase,
+    private val saveActivityUseCase: SaveActivityUseCase,
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
@@ -52,6 +57,12 @@ class HomeViewModel(
     val effects = _effects.receiveAsFlow()
 
     private var timerJob: Job? = null
+    private class TrackSessionAccumulator(
+        val track: Track,
+        val cadenceSamples: MutableList<Int> = mutableListOf()
+    )
+
+    private val sessionPlayedTracks = linkedMapOf<String, TrackSessionAccumulator>()
     private var playerProgressJob: Job? = null
     private var lastCheckedLikedUri: String? = null
     private var lastSyncedControllerPosMs: Long = -1L
@@ -93,7 +104,15 @@ class HomeViewModel(
                 if (snapshot.positionMs != lastSyncedControllerPosMs) {
                     lastSyncedControllerPosMs = snapshot.positionMs
                 }
-
+                val currentSuccess = _uiState.value as? HomeUiState.Success
+                if (currentSuccess?.run?.status == RunStatus.RUNNING) {
+                    val activeTrack = snapshot.currentTrack ?: currentSuccess.player.currentTrack
+                    if (activeTrack != null && activeTrack.spotifyUri.isNotBlank()) {
+                        sessionPlayedTracks.getOrPut(activeTrack.spotifyUri) {
+                            TrackSessionAccumulator(activeTrack)
+                        }
+                    }
+                }
                 updateSuccessState { state ->
                     val resolvedTrack = snapshot.currentTrack ?: state.player.currentTrack
                     val duration = snapshot.durationMs.takeIf { it > 0L }
@@ -151,6 +170,7 @@ class HomeViewModel(
 
             userRepository.getCurrentUser()
                 .onSuccess { user ->
+                    localUserRepository.saveUser(user)
                     val hasPermission = locationProvider.hasLocationPermission()
                     _uiState.value = HomeUiState.Success(
                         user = user,
@@ -288,6 +308,10 @@ class HomeViewModel(
             hasPremium = false
         )
 
+        sessionPlayedTracks.clear()
+        currentState.player.currentTrack?.let { track ->
+            sessionPlayedTracks.getOrPut(track.spotifyUri) { TrackSessionAccumulator(track) }
+        }
         activityCoordinator.startSession(user)
         runTrackerNotifier.onRunStarted()
 
@@ -356,8 +380,28 @@ class HomeViewModel(
         timerJob?.cancel()
         runTrackerNotifier.onRunStopped()
         playbackRepository.pauseImmediate()
+
+        val currentState = _uiState.value as? HomeUiState.Success
+        val elapsedSeconds = currentState?.run?.elapsedSeconds ?: 0L
+        val currentUser = currentState?.user
+
         val completedActivity = activityCoordinator.endSession()
-        // TODO: Зберегти completedActivity у WorkoutRepository
+        val recordedTracks = sessionPlayedTracks.values.map { acc ->
+            val avgTrackCadence = if (acc.cadenceSamples.isNotEmpty()) {
+                acc.cadenceSamples.average().toInt()
+            } else {
+                0
+            }
+            ActivityTrack(
+                spotifyUri = acc.track.spotifyUri,
+                title = acc.track.title,
+                artist = acc.track.artist,
+                albumArtUrl = acc.track.albumArtUrl,
+                tempo = acc.track.tempo,
+                avgCadenceDuringTrack = avgTrackCadence
+            )
+        }
+        sessionPlayedTracks.clear()
 
         updateSuccessState {
             it.copy(
@@ -368,6 +412,19 @@ class HomeViewModel(
 
         viewModelScope.launch {
             playbackRepository.pause()
+
+            if (completedActivity != null && currentUser != null && elapsedSeconds >= 5L) {
+                saveActivityUseCase(
+                    user = currentUser,
+                    activity = completedActivity,
+                    activeDurationSeconds = elapsedSeconds,
+                    tracks = recordedTracks
+                ).onSuccess {
+                    _effects.send(HomeEffect.ShowMessage("Тренування збережено в історію"))
+                }.onFailure {
+                    _effects.send(HomeEffect.ShowMessage("Не вдалося зберегти тренування"))
+                }
+            }
         }
     }
 
@@ -379,6 +436,16 @@ class HomeViewModel(
                 activityCoordinator.onTick(
                     preferences = preferencesRepository.preferences.value
                 )
+
+                val currentSuccess = _uiState.value as? HomeUiState.Success
+                val activeTrack = currentSuccess?.player?.currentTrack
+                val currentCadence = activityCoordinator.sessionState.value.currentCadence
+                if (activeTrack != null && activeTrack.spotifyUri.isNotBlank() && currentCadence > 0) {
+                    sessionPlayedTracks
+                        .getOrPut(activeTrack.spotifyUri) { TrackSessionAccumulator(activeTrack) }
+                        .cadenceSamples
+                        .add(currentCadence)
+                }
 
                 updateSuccessState { state ->
                     state.copy(

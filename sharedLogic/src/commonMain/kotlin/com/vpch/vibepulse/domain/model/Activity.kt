@@ -4,8 +4,10 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 data class Activity(
+    val id: Long = 0L,
     val startTime: Instant = Clock.System.now(),
     val endTime: Instant? = null,
+    val activeDurationSeconds: Long = 0L,
     val totalSteps: Int = 0,
     val avgCadence: Double = 0.0,
     val maxCadence: Double = 0.0,

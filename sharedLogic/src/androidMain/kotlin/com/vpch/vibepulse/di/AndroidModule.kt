@@ -5,6 +5,9 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SharedPreferencesSettings
+import com.vpch.vibepulse.data.local.VibePulseDatabase
+import com.vpch.vibepulse.data.local.getDatabaseBuilder
+import com.vpch.vibepulse.data.local.getRoomDatabase
 import com.vpch.vibepulse.location.AndroidLocationProvider
 import com.vpch.vibepulse.location.LocationProvider
 import com.vpch.vibepulse.player.AndroidSpotifyRemoteClient
@@ -45,5 +48,8 @@ val androidModule = module {
     }
 
     single<RunTrackerNotifier> { AndroidRunTrackerNotifier(androidContext()) }
+
+    single<VibePulseDatabase> { getRoomDatabase(getDatabaseBuilder(androidContext())) }
+    single { get<VibePulseDatabase>().activityDao() }
 }
 

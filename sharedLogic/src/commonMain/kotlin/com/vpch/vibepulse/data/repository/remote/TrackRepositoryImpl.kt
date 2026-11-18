@@ -1,11 +1,10 @@
-package com.vpch.vibepulse.data.repository
+package com.vpch.vibepulse.data.repository.remote
 
 import com.vpch.vibepulse.domain.model.TrackAudioFeatures
 import com.vpch.vibepulse.domain.model.TrackCandidate
 import com.vpch.vibepulse.domain.repository.TrackRepository
 import com.vpch.vibepulse.network.ReccoBeatsApiService
 import com.vpch.vibepulse.network.SpotifyApiService
-import com.vpch.vibepulse.network.model.ReccoBeatsAudioFeaturesDto
 import com.vpch.vibepulse.utils.toDomain
 
 class TrackRepositoryImpl(

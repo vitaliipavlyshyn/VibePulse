@@ -1,4 +1,4 @@
-package com.vpch.vibepulse.data.repository
+package com.vpch.vibepulse.data.repository.remote
 
 import com.vpch.vibepulse.domain.model.User
 import com.vpch.vibepulse.domain.repository.UserRepository

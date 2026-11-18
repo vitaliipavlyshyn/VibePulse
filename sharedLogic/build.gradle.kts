@@ -63,6 +63,21 @@ buildkonfig {
             "SPOTIFY_REDIRECT_URI",
             "vibepulse://spotify-callback"
         )
+        buildConfigField(
+            FieldSpec.Type.STRING,
+            "SPOTIFY_PACKAGE_NAME",
+            "com.spotify.music"
+        )
+        buildConfigField(
+            FieldSpec.Type.STRING,
+            "SPOTIFY_TRACK_URI_PREFIX",
+            "spotify:track:"
+        )
+        buildConfigField(
+            FieldSpec.Type.STRING,
+            "SPOTIFY_OPEN_TRACK_BASE_URL",
+            "https://open.spotify.com/track/"
+        )
     }
 }
 
