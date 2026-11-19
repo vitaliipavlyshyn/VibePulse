@@ -38,6 +38,7 @@ import com.vpch.vibepulse.domain.model.User
 import com.vpch.vibepulse.domain.model.WeatherSnapshot
 import com.vpch.vibepulse.presentation.home.HomeEffect
 import com.vpch.vibepulse.presentation.home.HomeIntent
+import com.vpch.vibepulse.presentation.home.HomeMessage
 import com.vpch.vibepulse.presentation.home.HomeUiState
 import com.vpch.vibepulse.presentation.home.HomeViewModel
 import com.vpch.vibepulse.presentation.home.PlayerUiState
@@ -49,7 +50,7 @@ import com.vpch.vibepulse.screens.home.components.HomeDefaults
 import com.vpch.vibepulse.screens.home.components.HomeHeaderSection
 import com.vpch.vibepulse.screens.home.components.RunControlsSection
 import com.vpch.vibepulse.screens.home.components.SpotifyPlayerCard
-import com.vpch.vibepulse.screens.home.components.WorkoutTimerCard
+import com.vpch.vibepulse.screens.home.components.ActivityTimerCard
 import com.vpch.vibepulse.ui.AppTheme
 import com.vpch.vibepulse.ui.VibePulseTheme
 import com.vpch.vibepulse.ui.components.ErrorStateView
@@ -98,7 +99,7 @@ fun HomeScreen(
                 HomeEffect.RequestLocationPermission -> permissionLauncher.launch(permissionsToRequest)
                 HomeEffect.OpenLocationSettings -> context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                 HomeEffect.NavigateToAuth -> onSessionExpired()
-                is HomeEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
+                is HomeEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message.resolve(context))
             }
         }
     }
@@ -128,6 +129,7 @@ fun HomeContent(
     modifier: Modifier = Modifier,
     onNavigateToProfile: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     when (uiState) {
         HomeUiState.Loading -> {
             Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -137,7 +139,7 @@ fun HomeContent(
 
         is HomeUiState.Error -> {
             ErrorStateView(
-                message = uiState.message,
+                message = uiState.message.resolve(context),
                 onRetry = { onIntent(HomeIntent.LoadInitialData) },
                 secondaryActionLabel = stringResource(R.string.home_relogin),
                 onSecondaryAction = { onIntent(HomeIntent.LogoutClicked) },
@@ -189,7 +191,7 @@ fun HomeContent(
                         onSeekTo = { positionMs -> onIntent(HomeIntent.SeekTo(positionMs)) }
                     )
 
-                    WorkoutTimerCard(
+                    ActivityTimerCard(
                         runStatus = uiState.run.status,
                         elapsedSeconds = uiState.run.elapsedSeconds
                     )
@@ -199,7 +201,17 @@ fun HomeContent(
 
                 RunControlsSection(
                     runStatus = uiState.run.status,
-                    onStart = { onIntent(HomeIntent.StartRunClicked) },
+                    onStart = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACTIVITY_RECOGNITION
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            onRequestPermissions()
+                        }
+                        onIntent(HomeIntent.StartRunClicked)
+                    },
                     onPause = { onIntent(HomeIntent.PauseRunClicked) },
                     onResume = { onIntent(HomeIntent.ResumeRunClicked) },
                     onFinish = { onIntent(HomeIntent.FinishRunClicked) }
@@ -243,4 +255,21 @@ private fun HomeScreenPreview() {
             )
         }
     }
+}
+
+private fun HomeMessage.resolve(context: android.content.Context): String = when (this) {
+    HomeMessage.ProfileLoadError -> context.getString(R.string.home_error_profile)
+    HomeMessage.LocationPermissionRequired -> context.getString(R.string.home_error_location_permission)
+    HomeMessage.GpsDisabled -> context.getString(R.string.home_error_gps_disabled)
+    HomeMessage.WeatherLoadError -> context.getString(R.string.home_error_weather)
+    HomeMessage.ActivitySaved -> context.getString(R.string.home_msg_activity_saved)
+    HomeMessage.ActivitySaveFailed -> context.getString(R.string.home_msg_activity_save_failed)
+    is HomeMessage.ActivityTooShort -> context.getString(R.string.home_msg_activity_too_short, minSeconds)
+    HomeMessage.PlayerControlError -> context.getString(R.string.home_error_player_control)
+    HomeMessage.SkipTrackError -> context.getString(R.string.home_error_skip_track)
+    HomeMessage.SeekTrackError -> context.getString(R.string.home_error_seek_track)
+    HomeMessage.TrackLiked -> context.getString(R.string.home_msg_track_liked)
+    HomeMessage.TrackUnliked -> context.getString(R.string.home_msg_track_unliked)
+    HomeMessage.LikeUpdateError -> context.getString(R.string.home_error_like_failed)
+    is HomeMessage.Custom -> text
 }

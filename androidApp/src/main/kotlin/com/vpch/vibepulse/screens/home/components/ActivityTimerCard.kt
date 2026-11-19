@@ -21,7 +21,7 @@ import com.vpch.vibepulse.ui.mapper.toTimerStatusLabel
 import com.vpch.vibepulse.utils.formatSecondsToClock
 
 @Composable
-internal fun WorkoutTimerCard(
+internal fun ActivityTimerCard(
     runStatus: RunStatus,
     elapsedSeconds: Long,
     modifier: Modifier = Modifier
@@ -56,10 +56,10 @@ internal fun WorkoutTimerCard(
 
 @PreviewLightDark
 @Composable
-private fun WorkoutTimerCardPreview() = VibePulsePreview {
+private fun ActivityTimerCardPreview() = VibePulsePreview {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        WorkoutTimerCard(runStatus = RunStatus.IDLE, elapsedSeconds = 0L)
-        WorkoutTimerCard(runStatus = RunStatus.RUNNING, elapsedSeconds = 1543L)
-        WorkoutTimerCard(runStatus = RunStatus.PAUSED, elapsedSeconds = 3605L)
+        ActivityTimerCard(runStatus = RunStatus.IDLE, elapsedSeconds = 0L)
+        ActivityTimerCard(runStatus = RunStatus.RUNNING, elapsedSeconds = 1543L)
+        ActivityTimerCard(runStatus = RunStatus.PAUSED, elapsedSeconds = 3605L)
     }
 }

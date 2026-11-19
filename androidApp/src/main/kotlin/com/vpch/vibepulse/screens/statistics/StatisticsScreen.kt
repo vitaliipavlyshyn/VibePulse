@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vpch.vibepulse.R
 import com.vpch.vibepulse.domain.model.StatisticsSummary
 import com.vpch.vibepulse.presentation.statistics.StatisticsIntent
+import com.vpch.vibepulse.presentation.statistics.StatisticsMessage
 import com.vpch.vibepulse.presentation.statistics.StatisticsUiState
 import com.vpch.vibepulse.presentation.statistics.StatisticsViewModel
 import com.vpch.vibepulse.screens.statistics.components.ActivityDetailsSheetContent
@@ -72,10 +74,10 @@ fun StatisticsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatisticsContent(
+    modifier: Modifier = Modifier,
     uiState: StatisticsUiState,
     bottomPadding: Dp = 0.dp,
     onIntent: (StatisticsIntent) -> Unit,
-    modifier: Modifier = Modifier
 ) {
     when (uiState) {
         StatisticsUiState.Loading -> {
@@ -92,7 +94,7 @@ fun StatisticsContent(
                 contentAlignment = Alignment.Center
             ) {
                 BodyText(
-                    text = uiState.message,
+                    text = uiState.message.resolve(),
                     color = AppTheme.colors.textError,
                     style = AppTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center
@@ -250,6 +252,13 @@ fun StatisticsContent(
             }
         }
     }
+}
+
+@Composable
+private fun StatisticsMessage.resolve(): String = when (this) {
+    StatisticsMessage.LoadError -> stringResource(R.string.stats_error_load)
+    StatisticsMessage.UserIdentifyError -> stringResource(R.string.stats_error_user)
+    is StatisticsMessage.Custom -> text
 }
 
 @PreviewLightDark

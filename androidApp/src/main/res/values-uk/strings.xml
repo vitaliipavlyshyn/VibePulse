@@ -122,4 +122,23 @@
     <string name="spotify_open_dialog_cancel">Скасувати</string>
     <string name="profile_tier_trial">TRIAL</string>
     <string name="player_open_in_spotify">Відкрити трек у Spotify</string>
+    <string name="home_error_profile">Не вдалося завантажити дані профілю</string>
+    <string name="home_error_location_permission">Надайте доступ до локації для відображення погоди</string>
+    <string name="home_error_gps_disabled">Увімкніть геолокацію (GPS) для визначення погоди</string>
+    <string name="home_error_weather">Помилка завантаження погоди</string>
+    <string name="home_msg_activity_saved">Тренування збережено в історію</string>
+    <string name="home_msg_activity_save_failed">Не вдалося зберегти тренування</string>
+    <string name="home_msg_activity_too_short">Тренування занадто коротке (мін. %1$d сек)</string>
+    <string name="home_error_player_control">Помилка керування плеєром</string>
+    <string name="home_error_skip_track">Не вдалося перемкнути трек</string>
+    <string name="home_error_seek_track">Не вдалося перемотати трек</string>
+    <string name="home_msg_track_liked">Додано в улюблені</string>
+    <string name="home_msg_track_unliked">Видалено з улюблених</string>
+    <string name="home_error_like_failed">Не вдалося оновити улюблені</string>
+    <string name="stats_sort_newest">Спочатку новіші</string>
+    <string name="stats_sort_oldest">Спочатку старіші</string>
+    <string name="stats_sort_most_steps">Найбільше кроків</string>
+    <string name="stats_sort_highest_cadence">Найвищий каденс</string>
+    <string name="stats_error_load">Помилка завантаження статистики</string>
+    <string name="stats_error_user">Не вдалося визначити користувача</string>
 </resources>

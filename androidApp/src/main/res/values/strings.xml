@@ -122,4 +122,23 @@
     <string name="spotify_open_dialog_cancel">Cancel</string>
     <string name="profile_tier_trial">TRIAL</string>
     <string name="player_open_in_spotify">Open track in Spotify</string>
+    <string name="home_error_profile">Failed to load profile data</string>
+    <string name="home_error_location_permission">Grant location permission to display weather</string>
+    <string name="home_error_gps_disabled">Enable GPS location to get weather updates</string>
+    <string name="home_error_weather">Failed to load weather</string>
+    <string name="home_msg_activity_saved">Workout saved to history</string>
+    <string name="home_msg_activity_save_failed">Failed to save workout</string>
+    <string name="home_msg_activity_too_short">Workout is too short (min. %1$d sec)</string>
+    <string name="home_error_player_control">Player control error</string>
+    <string name="home_error_skip_track">Failed to skip track</string>
+    <string name="home_error_seek_track">Failed to seek track</string>
+    <string name="home_msg_track_liked">Added to liked songs</string>
+    <string name="home_msg_track_unliked">Removed from liked songs</string>
+    <string name="home_error_like_failed">Failed to update liked songs</string>
+    <string name="stats_sort_newest">Newest first</string>
+    <string name="stats_sort_oldest">Oldest first</string>
+    <string name="stats_sort_most_steps">Most steps</string>
+    <string name="stats_sort_highest_cadence">Highest cadence</string>
+    <string name="stats_error_load">Failed to load statistics</string>
+    <string name="stats_error_user">Failed to identify user</string>
 </resources>
