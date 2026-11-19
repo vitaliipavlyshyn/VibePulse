@@ -16,7 +16,7 @@ data class WeatherUiState(
     val hasPermission: Boolean = false,
     val isLocationEnabled: Boolean = true,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: HomeMessage? = null
 )
 
 data class RunUiState(
@@ -45,7 +45,7 @@ sealed interface HomeUiState {
         val player: PlayerUiState = PlayerUiState()
     ) : HomeUiState
 
-    data class Error(val message: String) : HomeUiState
+    data class Error(val message: HomeMessage) : HomeUiState
 }
 
 sealed interface HomeIntent {
@@ -68,6 +68,6 @@ sealed interface HomeIntent {
 sealed interface HomeEffect {
     data object RequestLocationPermission : HomeEffect
     data object NavigateToAuth : HomeEffect
-    data class ShowMessage(val message: String) : HomeEffect
+    data class ShowMessage(val message: HomeMessage) : HomeEffect
     data object OpenLocationSettings : HomeEffect
 }

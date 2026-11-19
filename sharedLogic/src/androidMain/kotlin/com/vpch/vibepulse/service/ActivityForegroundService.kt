@@ -13,7 +13,7 @@ import com.vpch.vibepulse.domain.repository.PlaybackRepository
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
-class WorkoutForegroundService : Service(), KoinComponent {
+class ActivityForegroundService : Service(), KoinComponent {
 
     private val playbackRepository: PlaybackRepository by inject()
     private val runTrackerNotifier: RunTrackerNotifier by inject()
@@ -83,7 +83,7 @@ class WorkoutForegroundService : Service(), KoinComponent {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val finishIntent = Intent(this, WorkoutForegroundService::class.java).apply {
+        val finishIntent = Intent(this, ActivityForegroundService::class.java).apply {
             action = ACTION_FINISH
         }
         val finishPendingIntent = PendingIntent.getService(

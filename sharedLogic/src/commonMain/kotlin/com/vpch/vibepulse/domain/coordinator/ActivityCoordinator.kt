@@ -1,6 +1,7 @@
 package com.vpch.vibepulse.domain.coordinator
 
 import com.vpch.vibepulse.domain.model.Activity
+import com.vpch.vibepulse.domain.model.ActivitySessionSnapshot
 import com.vpch.vibepulse.domain.model.CadenceZone
 import com.vpch.vibepulse.domain.model.PaceZone
 import com.vpch.vibepulse.domain.model.PlaylistPreferences
@@ -8,7 +9,7 @@ import com.vpch.vibepulse.domain.model.User
 import com.vpch.vibepulse.domain.model.WeatherSnapshot
 import com.vpch.vibepulse.domain.repository.PlaybackRepository
 import com.vpch.vibepulse.domain.repository.WeatherRepository
-import com.vpch.vibepulse.domain.usecase.GenerateWorkoutPlaylistUseCase
+import com.vpch.vibepulse.domain.usecase.GenerateActivityPlaylistUseCase
 import com.vpch.vibepulse.sensor.CadenceMeter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,21 +19,14 @@ import kotlin.math.abs
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
-data class WorkoutSessionSnapshot(
-    val activity: Activity? = null,
-    val currentZone: PaceZone? = null,
-    val currentCadence: Int = 0,
-    val cadenceZone: CadenceZone = CadenceZone.IDLE
-)
-
 class ActivityCoordinator(
     private val cadenceMeter: CadenceMeter,
     private val weatherRepository: WeatherRepository,
-    private val generatePlaylist: GenerateWorkoutPlaylistUseCase,
+    private val generatePlaylist: GenerateActivityPlaylistUseCase,
     private val playbackRepository: PlaybackRepository
 ) {
-    private val _sessionState = MutableStateFlow(WorkoutSessionSnapshot())
-    val sessionState: StateFlow<WorkoutSessionSnapshot> = _sessionState.asStateFlow()
+    private val _sessionState = MutableStateFlow(ActivitySessionSnapshot())
+    val sessionState: StateFlow<ActivitySessionSnapshot> = _sessionState.asStateFlow()
 
     private var lastAppliedCadence: Int = 0
     private val minuteSamples = mutableListOf<Int>()
@@ -43,11 +37,15 @@ class ActivityCoordinator(
     private var lastSyncMark: TimeMark? = null
     private var isBusy = false
 
+    private var hasDetectedMovement = false
+    private var zeroCadenceStreakSeconds = 0
+
     private val evaluationIntervalSeconds = 60L
     private val fastReactionWindowSize = 8
-    private val minSamplesForFastSwitch = 12
-    private val fastSwitchCadenceDelta = 20
-    private val switchCooldownSeconds = 20L
+    private val minSamplesForFastSwitch = 6
+    private val fastSwitchCadenceDelta = 15
+    private val switchCooldownSeconds = 12L
+    private val autoPauseAfterZeroSeconds = 4
 
     fun startSession(user: User): Activity {
         lastAppliedCadence = 0
@@ -57,13 +55,15 @@ class ActivityCoordinator(
         lastZoneSwitchMark = null
         lastSyncMark = null
         isBusy = false
+        hasDetectedMovement = false
+        zeroCadenceStreakSeconds = 0
         generatePlaylist.resetHistory()
         playbackRepository.resetQueue()
 
         val initialActivity = Activity().let { base ->
             weatherRepository.currentWeather.value?.let { base.attachWeather(it) } ?: base
         }
-        _sessionState.value = WorkoutSessionSnapshot(activity = initialActivity)
+        _sessionState.value = ActivitySessionSnapshot(activity = initialActivity)
         cadenceMeter.start()
         return initialActivity
     }
@@ -79,7 +79,7 @@ class ActivityCoordinator(
             averageCadence = 110,
             weather = weather,
             preferences = preferences,
-            count = 3
+            count = 2
         )
 
         if (initialTracks.isNotEmpty()) {
@@ -96,6 +96,35 @@ class ActivityCoordinator(
     suspend fun onTick(preferences: PlaylistPreferences? = null) {
         val currentActivity = _sessionState.value.activity ?: return
         val currentCadence = cadenceMeter.getCadence()
+
+        if (currentCadence > 0) {
+            hasDetectedMovement = true
+            zeroCadenceStreakSeconds = 0
+
+            // Якщо були на автопаузі через зупинку — відновлюємо відтворення
+            if (_sessionState.value.isAutoPaused) {
+                _sessionState.update { it.copy(isAutoPaused = false) }
+                playbackRepository.resume()
+            }
+        } else if (hasDetectedMovement) {
+            zeroCadenceStreakSeconds++
+            if (zeroCadenceStreakSeconds >= autoPauseAfterZeroSeconds && !_sessionState.value.isAutoPaused) {
+                _sessionState.update {
+                    it.copy(
+                        currentCadence = 0,
+                        cadenceZone = CadenceZone.IDLE,
+                        isAutoPaused = true
+                    )
+                }
+                playbackRepository.pauseImmediate()
+                playbackRepository.pause()
+                return
+            }
+        }
+
+        // Якщо на автопаузі — не записуємо нульові семпли і не перемикаємо плейлист
+        if (_sessionState.value.isAutoPaused) return
+
         val updatedActivity = currentActivity.addSample(currentCadence)
 
         _sessionState.update {
@@ -157,7 +186,7 @@ class ActivityCoordinator(
                             averageCadence = targetCadence,
                             weather = weather,
                             preferences = preferences,
-                            count = 3
+                            count = 2
                         )
                         if (batch.isNotEmpty()) {
                             playbackRepository.playBatch(batch).onSuccess {
@@ -181,23 +210,27 @@ class ActivityCoordinator(
         if (elapsedSync == null || elapsedSync >= syncInterval) {
             lastSyncMark = TimeSource.Monotonic.markNow()
             playbackRepository.syncState()
+            ensureQueuePopulated(preferences)
+        }
+    }
 
-            val activeZone = _sessionState.value.currentZone
-            if (activeZone != null && playbackRepository.state.value.remainingMs <= 25_000L) {
-                val weather = fetchWeatherIfNeeded(preferences)
-                val fallbackCadence = recentSamples.lastOrNull()
-                    ?: minuteSamples.lastOrNull()
-                    ?: activeZone.minBpm
-                playbackRepository.enqueueNextIfNeeded {
-                    generatePlaylist(
-                        zone = activeZone,
-                        averageCadence = fallbackCadence,
-                        weather = weather,
-                        preferences = preferences,
-                        count = 1
-                    ).firstOrNull()
-                }
-            }
+    suspend fun ensureQueuePopulated(preferences: PlaylistPreferences?) {
+        if (_sessionState.value.isAutoPaused) return
+        val activeZone = _sessionState.value.currentZone ?: return
+        val weather = fetchWeatherIfNeeded(preferences)
+        val targetCadence = recentSamples.lastOrNull()
+            ?: minuteSamples.lastOrNull()
+            ?: lastAppliedCadence.takeIf { it > 0 }
+            ?: ((activeZone.minBpm + activeZone.maxBpm) / 2)
+
+        playbackRepository.enqueueNextIfNeeded {
+            generatePlaylist(
+                zone = activeZone,
+                averageCadence = targetCadence,
+                weather = weather,
+                preferences = preferences,
+                count = 1
+            ).firstOrNull()
         }
     }
 
@@ -214,14 +247,21 @@ class ActivityCoordinator(
         return snapshot
     }
 
-    fun pauseSession() = cadenceMeter.stop()
+    fun pauseSession() {
+        cadenceMeter.stop()
+        _sessionState.update { it.copy(isAutoPaused = false) }
+    }
 
-    fun resumeSession() = cadenceMeter.start()
+    fun resumeSession() {
+        zeroCadenceStreakSeconds = 0
+        _sessionState.update { it.copy(isAutoPaused = false) }
+        cadenceMeter.start()
+    }
 
     fun endSession(): Activity? {
         cadenceMeter.stop()
         val finished = _sessionState.value.activity?.finish()
-        _sessionState.value = WorkoutSessionSnapshot()
+        _sessionState.value = ActivitySessionSnapshot()
         lastAppliedCadence = 0
         minuteSamples.clear()
         recentSamples.clear()
@@ -229,6 +269,8 @@ class ActivityCoordinator(
         lastZoneSwitchMark = null
         lastSyncMark = null
         isBusy = false
+        hasDetectedMovement = false
+        zeroCadenceStreakSeconds = 0
         return finished
     }
 }

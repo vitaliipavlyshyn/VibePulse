@@ -26,12 +26,7 @@ class ProfileViewModel(
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(
-        ProfileUiState(
-            tier = resolveUserTier(subscriptionManager.state.value),
-            preferences = preferencesRepository.preferences.value
-        )
-    )
+    private val _uiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     private val _effects = Channel<ProfileEffect>(Channel.BUFFERED)
@@ -39,17 +34,33 @@ class ProfileViewModel(
 
     init {
         subscriptionManager.refresh()
-        loadProfile()
+        observeSubscriptionAndPreferences()
+        onIntent(ProfileIntent.LoadProfile)
+    }
 
+    fun onIntent(intent: ProfileIntent) {
+        when (intent) {
+            ProfileIntent.LoadProfile -> loadProfile()
+            is ProfileIntent.ToggleGenre -> toggleGenre(intent.genre)
+            is ProfileIntent.ToggleWeatherAdaptation -> setWeatherEnabled(intent.enabled)
+            is ProfileIntent.ToggleExcludeRemixesAndCovers -> setExcludeRemixesAndCovers(intent.exclude)
+            is ProfileIntent.ToggleExcludeExplicit -> setExcludeExplicit(intent.exclude)
+            ProfileIntent.LogoutClicked -> logout()
+        }
+    }
+
+    private fun observeSubscriptionAndPreferences() {
         viewModelScope.launch {
             subscriptionManager.state.collect { subState ->
-                _uiState.update { it.copy(tier = resolveUserTier(subState)) }
+                updateSuccessState { it.copy(tier = resolveUserTier(subState)) }
             }
         }
 
         viewModelScope.launch {
             preferencesRepository.preferences.collect { prefs ->
-                _uiState.update { it.copy(preferences = prefs) }
+                updateSuccessState {
+                    it.copy(preferencesState = it.preferencesState.copy(preferences = prefs))
+                }
             }
         }
     }
@@ -63,46 +74,62 @@ class ProfileViewModel(
 
     private fun loadProfile() {
         viewModelScope.launch {
+            _uiState.value = ProfileUiState.Loading
             userRepository.getCurrentUser()
                 .onSuccess { user ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            user = user,
-                            tier = resolveUserTier(subscriptionManager.state.value)
+                    _uiState.value = ProfileUiState.Success(
+                        user = user,
+                        tier = resolveUserTier(subscriptionManager.state.value),
+                        preferencesState = PreferencesUiState(
+                            preferences = preferencesRepository.preferences.value
                         )
-                    }
+                    )
                 }
-                .onFailure {
-                    _uiState.update { it.copy(isLoading = false) }
+                .onFailure { error ->
+                    val msg = error.message?.takeIf { it.isNotBlank() }
+                        ?.let { ProfileMessage.Custom(it) }
+                        ?: ProfileMessage.ProfileLoadError
+                    _uiState.value = ProfileUiState.Error(message = msg)
                 }
         }
     }
 
-    fun toggleGenre(genre: String) {
-        if (!_uiState.value.tier.hasPremiumAccess) return
+    private fun toggleGenre(genre: String) {
+        val current = _uiState.value as? ProfileUiState.Success ?: return
+        if (!current.tier.hasPremiumAccess) return
         preferencesRepository.update { it.toggleGenre(genre) }
     }
 
-    fun setWeatherEnabled(enabled: Boolean) {
-        if (!_uiState.value.tier.hasPremiumAccess) return
+    private fun setWeatherEnabled(enabled: Boolean) {
+        val current = _uiState.value as? ProfileUiState.Success ?: return
+        if (!current.tier.hasPremiumAccess) return
         preferencesRepository.update { it.copy(weatherEnabled = enabled) }
     }
 
-    fun setExcludeRemixesAndCovers(exclude: Boolean) {
-        if (!_uiState.value.tier.hasPremiumAccess) return
+    private fun setExcludeRemixesAndCovers(exclude: Boolean) {
+        val current = _uiState.value as? ProfileUiState.Success ?: return
+        if (!current.tier.hasPremiumAccess) return
         preferencesRepository.update { it.copy(excludeRemixesAndCovers = exclude) }
     }
 
-    fun setExcludeExplicit(exclude: Boolean) {
-        if (!_uiState.value.tier.hasPremiumAccess) return
+    private fun setExcludeExplicit(exclude: Boolean) {
+        val current = _uiState.value as? ProfileUiState.Success ?: return
+        if (!current.tier.hasPremiumAccess) return
         preferencesRepository.update { it.copy(excludeExplicit = exclude) }
     }
 
-    fun logout() {
+    private fun logout() {
         viewModelScope.launch {
             logoutUseCase()
             _effects.send(ProfileEffect.NavigateToAuth)
+        }
+    }
+
+    private inline fun updateSuccessState(
+        crossinline transform: (ProfileUiState.Success) -> ProfileUiState.Success
+    ) {
+        _uiState.update { current ->
+            if (current is ProfileUiState.Success) transform(current) else current
         }
     }
 }

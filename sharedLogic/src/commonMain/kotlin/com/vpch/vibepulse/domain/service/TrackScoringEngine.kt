@@ -21,7 +21,7 @@ class TrackScoringEngine {
     ): List<String> {
         val userGenres = preferences?.genres?.filter { it.isNotBlank() }.orEmpty()
         if (userGenres.isNotEmpty()) {
-            return userGenres.shuffled().take(2)
+            return userGenres.map(::normalizeGenreForSpotify).shuffled().take(2)
         }
 
         val condition = if (preferences?.weatherEnabled != false) {
@@ -127,5 +127,12 @@ class TrackScoringEngine {
 
         return ((energyScore * 0.50) + (danceScore * 0.25) + (valenceScore * 0.25))
             .coerceIn(0.0, 1.0)
+    }
+
+    private fun normalizeGenreForSpotify(raw: String): String = when (raw.trim().lowercase()) {
+        "drum & bass", "drum and bass" -> "drum-and-bass"
+        "r&b", "rnb" -> "r-n-b"
+        "hip-hop", "hip hop" -> "hip-hop"
+        else -> raw.trim().lowercase()
     }
 }

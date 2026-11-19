@@ -50,6 +50,10 @@ class HomeViewModel(
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
+    private companion object {
+        const val MIN_ACTIVITY_DURATION_SECONDS = 60L
+    }
+
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -193,9 +197,10 @@ class HomeViewModel(
                     if (isUnauthorizedError(error)) {
                         handleSessionExpired()
                     } else {
-                        _uiState.value = HomeUiState.Error(
-                            message = error.message ?: "Не вдалося завантажити дані профілю"
-                        )
+                        val msg = error.message?.takeIf { it.isNotBlank() }
+                            ?.let { HomeMessage.Custom(it) }
+                            ?: HomeMessage.ProfileLoadError
+                        _uiState.value = HomeUiState.Error(message = msg)
                     }
                 }
         }
@@ -240,7 +245,7 @@ class HomeViewModel(
                 it.copy(
                     weather = it.weather.copy(
                         isLoading = false,
-                        error = "Надайте доступ до локації для відображення погоди"
+                        error = HomeMessage.LocationPermissionRequired
                     )
                 )
             }
@@ -275,9 +280,11 @@ class HomeViewModel(
                 .onFailure { error ->
                     val isGpsOff = error is LocationDisabledException || !locationProvider.isLocationEnabled()
                     val msg = if (isGpsOff) {
-                        "Увімкніть геолокацію (GPS) для визначення погоди"
+                        HomeMessage.GpsDisabled
                     } else {
-                        error.message ?: "Помилка завантаження погоди"
+                        error.message?.takeIf { it.isNotBlank() }
+                            ?.let { HomeMessage.Custom(it) }
+                            ?: HomeMessage.WeatherLoadError
                     }
 
                     updateSuccessState {
@@ -386,21 +393,24 @@ class HomeViewModel(
         val currentUser = currentState?.user
 
         val completedActivity = activityCoordinator.endSession()
-        val recordedTracks = sessionPlayedTracks.values.map { acc ->
-            val avgTrackCadence = if (acc.cadenceSamples.isNotEmpty()) {
-                acc.cadenceSamples.average().toInt()
-            } else {
-                0
+        val recordedTracks = sessionPlayedTracks.values
+            .toList()
+            .asReversed()
+            .map { acc ->
+                val avgTrackCadence = if (acc.cadenceSamples.isNotEmpty()) {
+                    acc.cadenceSamples.average().toInt()
+                } else {
+                    0
+                }
+                ActivityTrack(
+                    spotifyUri = acc.track.spotifyUri,
+                    title = acc.track.title,
+                    artist = acc.track.artist,
+                    albumArtUrl = acc.track.albumArtUrl,
+                    tempo = acc.track.tempo,
+                    avgCadenceDuringTrack = avgTrackCadence
+                )
             }
-            ActivityTrack(
-                spotifyUri = acc.track.spotifyUri,
-                title = acc.track.title,
-                artist = acc.track.artist,
-                albumArtUrl = acc.track.albumArtUrl,
-                tempo = acc.track.tempo,
-                avgCadenceDuringTrack = avgTrackCadence
-            )
-        }
         sessionPlayedTracks.clear()
 
         updateSuccessState {
@@ -413,16 +423,24 @@ class HomeViewModel(
         viewModelScope.launch {
             playbackRepository.pause()
 
-            if (completedActivity != null && currentUser != null && elapsedSeconds >= 5L) {
-                saveActivityUseCase(
-                    user = currentUser,
-                    activity = completedActivity,
-                    activeDurationSeconds = elapsedSeconds,
-                    tracks = recordedTracks
-                ).onSuccess {
-                    _effects.send(HomeEffect.ShowMessage("Тренування збережено в історію"))
-                }.onFailure {
-                    _effects.send(HomeEffect.ShowMessage("Не вдалося зберегти тренування"))
+            if (completedActivity != null && currentUser != null) {
+                if (elapsedSeconds >= MIN_ACTIVITY_DURATION_SECONDS) {
+                    saveActivityUseCase(
+                        user = currentUser,
+                        activity = completedActivity,
+                        activeDurationSeconds = elapsedSeconds,
+                        tracks = recordedTracks
+                    ).onSuccess {
+                        _effects.send(HomeEffect.ShowMessage(HomeMessage.ActivitySaved))
+                    }.onFailure {
+                        _effects.send(HomeEffect.ShowMessage(HomeMessage.ActivitySaveFailed))
+                    }
+                } else {
+                    _effects.send(
+                        HomeEffect.ShowMessage(
+                            HomeMessage.ActivityTooShort(MIN_ACTIVITY_DURATION_SECONDS)
+                        )
+                    )
                 }
             }
         }
@@ -447,10 +465,13 @@ class HomeViewModel(
                         .add(currentCadence)
                 }
 
-                updateSuccessState { state ->
-                    state.copy(
-                        run = state.run.copy(elapsedSeconds = state.run.elapsedSeconds + 1)
-                    )
+                val sessionSnapshot = activityCoordinator.sessionState.value
+                if (!sessionSnapshot.isAutoPaused) {
+                    updateSuccessState { state ->
+                        state.copy(
+                            run = state.run.copy(elapsedSeconds = state.run.elapsedSeconds + 1)
+                        )
+                    }
                 }
 
                 val updated = (_uiState.value as? HomeUiState.Success)?.run
@@ -521,7 +542,7 @@ class HomeViewModel(
             result.onFailure { error ->
                 updateSuccessState { it.copy(player = it.player.copy(isPlaying = currentlyPlaying)) }
                 ensurePlayerProgressLoop(currentlyPlaying)
-                handleActionError(error, "Помилка керування плеєром")
+                handleActionError(error, HomeMessage.PlayerControlError)
             }
         }
     }
@@ -529,8 +550,13 @@ class HomeViewModel(
     private fun skipToNext() {
         viewModelScope.launch {
             playbackRepository.skipToNext()
+                .onSuccess {
+                    if ((_uiState.value as? HomeUiState.Success)?.run?.status == RunStatus.RUNNING) {
+                        activityCoordinator.ensureQueuePopulated(preferencesRepository.preferences.value)
+                    }
+                }
                 .onFailure { error ->
-                    handleActionError(error, "Не вдалося перемкнути трек")
+                    handleActionError(error, HomeMessage.SkipTrackError)
                 }
         }
     }
@@ -552,7 +578,7 @@ class HomeViewModel(
         viewModelScope.launch {
             playbackRepository.seekTo(clampedMs)
                 .onFailure { error ->
-                    handleActionError(error, "Не вдалося перемотати трек")
+                    handleActionError(error, HomeMessage.SeekTrackError)
                 }
         }
     }
@@ -581,7 +607,7 @@ class HomeViewModel(
                     }
                     _effects.send(
                         HomeEffect.ShowMessage(
-                            if (targetLiked) "Додано в улюблені" else "Видалено з улюблених"
+                            if (targetLiked) HomeMessage.TrackLiked else HomeMessage.TrackUnliked
                         )
                     )
                 }
@@ -594,7 +620,7 @@ class HomeViewModel(
                             )
                         )
                     }
-                    handleActionError(error, "Не вдалося оновити улюблені")
+                    handleActionError(error, HomeMessage.LikeUpdateError)
                 }
         }
     }
@@ -621,11 +647,14 @@ class HomeViewModel(
         }
     }
 
-    private suspend fun handleActionError(error: Throwable, fallbackMessage: String) {
+    private suspend fun handleActionError(error: Throwable, fallbackMessage: HomeMessage) {
         if (isUnauthorizedError(error)) {
             handleSessionExpired()
         } else {
-            _effects.send(HomeEffect.ShowMessage(error.message ?: fallbackMessage))
+            val resolved = error.message?.takeIf { it.isNotBlank() }
+                ?.let { HomeMessage.Custom(it) }
+                ?: fallbackMessage
+            _effects.send(HomeEffect.ShowMessage(resolved))
         }
     }
 

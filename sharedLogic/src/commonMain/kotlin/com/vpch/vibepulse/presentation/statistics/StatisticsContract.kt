@@ -6,12 +6,36 @@ import com.vpch.vibepulse.domain.usecase.EnrichedActivityDetails
 import com.vpch.vibepulse.domain.usecase.StatisticsPeriod
 import com.vpch.vibepulse.storage.SubscriptionState
 
-enum class ActivitySortOrder(val title: String) {
-    NEWEST_FIRST("Спочатку новіші"),
-    OLDEST_FIRST("Спочатку старіші"),
-    MOST_STEPS("Найбільше кроків"),
-    HIGHEST_CADENCE("Найвищий каденс")
+enum class ActivitySortOrder {
+    NEWEST_FIRST,
+    OLDEST_FIRST,
+    MOST_STEPS,
+    HIGHEST_CADENCE
 }
+
+data class OverviewUiState(
+    val selectedPeriod: StatisticsPeriod = StatisticsPeriod.WEEK,
+    val summary: StatisticsSummary = StatisticsSummary(
+        totalRuns = 0,
+        totalSteps = 0,
+        totalDurationSeconds = 0L,
+        overallAvgCadence = 0,
+        bestMaxCadence = 0,
+        dailyStats = emptyList()
+    )
+)
+
+data class HistoryUiState(
+    val sortOrder: ActivitySortOrder = ActivitySortOrder.NEWEST_FIRST,
+    val activities: List<Activity> = emptyList(),
+    val totalFilteredCount: Int = 0,
+    val hasMoreActivities: Boolean = false
+)
+
+data class ActivityDetailsUiState(
+    val selectedDetails: EnrichedActivityDetails? = null,
+    val isLoading: Boolean = false
+)
 
 sealed interface StatisticsUiState {
     data object Loading : StatisticsUiState
@@ -22,24 +46,12 @@ sealed interface StatisticsUiState {
 
     data class Success(
         val subscriptionState: SubscriptionState,
-        val selectedPeriod: StatisticsPeriod = StatisticsPeriod.WEEK,
-        val sortOrder: ActivitySortOrder = ActivitySortOrder.NEWEST_FIRST,
-        val summary: StatisticsSummary = StatisticsSummary(
-            totalRuns = 0,
-            totalSteps = 0,
-            totalDurationSeconds = 0L,
-            overallAvgCadence = 0,
-            bestMaxCadence = 0,
-            dailyStats = emptyList()
-        ),
-        val activities: List<Activity> = emptyList(),
-        val totalFilteredCount: Int = 0,
-        val hasMoreActivities: Boolean = false,
-        val selectedActivityDetails: EnrichedActivityDetails? = null,
-        val isDetailsLoading: Boolean = false
+        val overview: OverviewUiState = OverviewUiState(),
+        val history: HistoryUiState = HistoryUiState(),
+        val details: ActivityDetailsUiState = ActivityDetailsUiState()
     ) : StatisticsUiState
 
-    data class Error(val message: String) : StatisticsUiState
+    data class Error(val message: StatisticsMessage) : StatisticsUiState
 }
 
 sealed interface StatisticsIntent {
@@ -50,4 +62,8 @@ sealed interface StatisticsIntent {
     data class OpenActivityDetails(val activityId: Long) : StatisticsIntent
     data object CloseActivityDetails : StatisticsIntent
     data class DeleteActivity(val activityId: Long) : StatisticsIntent
+}
+
+sealed interface StatisticsEffect {
+    data class ShowMessage(val message: StatisticsMessage) : StatisticsEffect
 }

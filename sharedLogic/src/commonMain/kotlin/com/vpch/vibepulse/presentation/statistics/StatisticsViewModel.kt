@@ -117,18 +117,20 @@ class StatisticsViewModel(
                             }
                         }
                         .catch { error ->
-                            _uiState.value = StatisticsUiState.Error(
-                                message = error.message ?: "Помилка завантаження статистики"
-                            )
+                            val msg = error.message?.takeIf { it.isNotBlank() }
+                                ?.let { StatisticsMessage.Custom(it) }
+                                ?: StatisticsMessage.LoadError
+                            _uiState.value = StatisticsUiState.Error(message = msg)
                         }
                         .collect { newState ->
                             _uiState.value = newState
                         }
                 }
                 .onFailure { error ->
-                    _uiState.value = StatisticsUiState.Error(
-                        message = error.message ?: "Не вдалося визначити користувача"
-                    )
+                    val msg = error.message?.takeIf { it.isNotBlank() }
+                        ?.let { StatisticsMessage.Custom(it) }
+                        ?: StatisticsMessage.UserIdentifyError
+                    _uiState.value = StatisticsUiState.Error(message = msg)
                 }
         }
     }

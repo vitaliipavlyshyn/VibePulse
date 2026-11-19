@@ -9,11 +9,11 @@ import com.vpch.vibepulse.domain.repository.TrackRepository
 import com.vpch.vibepulse.domain.service.TrackScoringEngine
 import kotlin.math.roundToInt
 
-class GenerateWorkoutPlaylistUseCase(
+class GenerateActivityPlaylistUseCase(
     private val trackRepository: TrackRepository,
     private val scoringEngine: TrackScoringEngine
 ) {
-    private val playedUris = mutableSetOf<String>()
+    private val playedUris = LinkedHashSet<String>()
 
     private data class ScoredTrack(
         val track: Track,
@@ -27,7 +27,7 @@ class GenerateWorkoutPlaylistUseCase(
         averageCadence: Int,
         weather: WeatherSnapshot?,
         preferences: PlaylistPreferences?,
-        count: Int = 3
+        count: Int = 2
     ): List<Track> {
         val selectedGenres = scoringEngine.selectGenres(zone, weather, preferences)
         val yearWindow = listOf("year:2023-2026", "year:2019-2022", "year:2015-2018").random()
@@ -37,10 +37,10 @@ class GenerateWorkoutPlaylistUseCase(
             val batch = trackRepository.searchTracks(
                 query = "genre:\"$genre\" $yearWindow",
                 limit = 40,
-                offset = 0
+                offset = listOf(0, 15, 30, 50).random()
             ).getOrNull().orEmpty()
             collected.addAll(batch)
-            if (collected.size >= 50) break
+            if (collected.size >= 60) break
         }
 
         val clean = collected
@@ -48,17 +48,18 @@ class GenerateWorkoutPlaylistUseCase(
             .filter { it.isPlayable && !scoringEngine.isSpam(it) }
 
         val popular = clean
-            .filter { it.popularity >= 55 }
-            .ifEmpty { clean.filter { it.popularity >= 45 } }
+            .filter { it.popularity >= 50 }
+            .ifEmpty { clean.filter { it.popularity >= 40 } }
             .ifEmpty { clean }
 
         val primaryGenre = selectedGenres.firstOrNull().orEmpty()
+        val fallbackTempo = (zone.minBpm + zone.maxBpm) / 2
 
         val allowed = popular
             .map { candidate ->
                 candidate.copy(
                     track = candidate.track.copy(
-                        tempo = averageCadence,
+                        tempo = fallbackTempo,
                         genre = primaryGenre
                     )
                 )
@@ -67,18 +68,23 @@ class GenerateWorkoutPlaylistUseCase(
 
         val fresh = allowed
             .filterNot { it.track.spotifyUri in playedUris }
-            .ifEmpty { allowed }
+            .ifEmpty {
+                val recent = playedUris.toList().takeLast(15)
+                playedUris.clear()
+                playedUris.addAll(recent)
+                allowed.filterNot { it.track.spotifyUri in playedUris }.ifEmpty { allowed }
+            }
 
         if (fresh.isEmpty()) return emptyList()
 
-        val topCandidates = fresh
-            .sortedByDescending { it.popularity }
+        val sampleCandidates = fresh
+            .shuffled()
             .take(40)
 
-        val trackIds = topCandidates.map { it.track.spotifyUri.substringAfterLast(":") }
+        val trackIds = sampleCandidates.map { it.track.spotifyUri.substringAfterLast(":") }
         val featuresById = trackRepository.getAudioFeatures(trackIds).getOrDefault(emptyMap())
 
-        val analyzed = topCandidates.map { candidate ->
+        val analyzed = sampleCandidates.map { candidate ->
             val spotifyId = candidate.track.spotifyUri.substringAfterLast(":")
             val features = featuresById[spotifyId]
             val realTempo = features?.tempo?.roundToInt()?.takeIf { it > 0 } ?: candidate.track.tempo
@@ -107,7 +113,7 @@ class GenerateWorkoutPlaylistUseCase(
             .map { it.track }
 
         val selected = ranked
-            .take(maxOf(count * 3, 8))
+            .take(maxOf(count * 4, 8))
             .shuffled()
             .take(count)
 

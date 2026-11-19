@@ -14,7 +14,7 @@ import com.vpch.vibepulse.domain.repository.TrackRepository
 import com.vpch.vibepulse.domain.repository.UserRepository
 import com.vpch.vibepulse.domain.repository.WeatherRepository
 import com.vpch.vibepulse.domain.service.TrackScoringEngine
-import com.vpch.vibepulse.domain.usecase.GenerateWorkoutPlaylistUseCase
+import com.vpch.vibepulse.domain.usecase.GenerateActivityPlaylistUseCase
 import com.vpch.vibepulse.domain.usecase.GetActivityDetailsUseCase
 import com.vpch.vibepulse.domain.usecase.GetStatisticsSummaryUseCase
 import com.vpch.vibepulse.domain.usecase.LogoutUseCase
@@ -40,7 +40,7 @@ val domainModule = module {
     singleOf(::TrackRepositoryImpl) bind TrackRepository::class
 
     factoryOf(::TrackScoringEngine)
-    factoryOf(::GenerateWorkoutPlaylistUseCase)
+    factoryOf(::GenerateActivityPlaylistUseCase)
     factoryOf(::ToggleTrackLikeUseCase)
     factoryOf(::LogoutUseCase)
     factoryOf (::SaveActivityUseCase )

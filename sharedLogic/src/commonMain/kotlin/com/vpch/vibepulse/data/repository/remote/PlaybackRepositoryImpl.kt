@@ -111,7 +111,11 @@ class PlaybackRepositoryImpl(
     }
 
     override suspend fun pause(): Result<Unit> {
-        if (isCommandInFlight) return Result.success(Unit)
+        var waitAttempts = 0
+        while (isCommandInFlight && waitAttempts < 10) {
+            delay(50.milliseconds)
+            waitAttempts++
+        }
         isCommandInFlight = true
 
         val wasPlaying = _state.value.isPlaying
