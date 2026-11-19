@@ -26,9 +26,14 @@ data class Activity(
 
     fun calculateStatistics(): Activity {
         if (samples.isEmpty()) return this
-        val avg = samples.map { it.stepsPerMinute }.average()
+        val nonZeroSamples = samples.filter { it.stepsPerMinute > 0 }
+        val avg = if (nonZeroSamples.isNotEmpty()) {
+            nonZeroSamples.map { it.stepsPerMinute }.average()
+        } else {
+            0.0
+        }
         val max = samples.maxOf { it.stepsPerMinute }.toDouble()
-        val steps = samples.sumOf { (it.stepsPerMinute / 60.0).toInt() }
+        val steps = kotlin.math.round(samples.sumOf { it.stepsPerMinute / 60.0 }).toInt()
         return copy(
             totalSteps = steps,
             avgCadence = avg,

@@ -5,11 +5,10 @@ enum class PaceZone(
     val maxBpm: Int,
     val searchTag: String
 ) {
-    WALK(0, 114, "power walk chill"),
-    JOG(115, 144, "jogging upbeat"),
-    RUN(145, 169, "running workout"),
-    SPRINT(170, 300, "fast running high energy");
-
+    WALK(0, 124, "power walk chill"),
+    JOG(125, 149, "jogging upbeat"),
+    RUN(150, 174, "running workout"),
+    SPRINT(175, 300, "fast running high energy");
     companion object {
         private const val HYSTERESIS = 4
 

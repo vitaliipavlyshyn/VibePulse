@@ -47,24 +47,27 @@ class AndroidCadenceMeter(
         if (isListening) return
         detector.reset()
 
+        val accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        if (accelSensor != null) {
+            isListening = sensorManager.registerListener(
+                listener,
+                accelSensor,
+                SensorManager.SENSOR_DELAY_GAME
+            )
+            return
+        }
+
         val stepSensor = if (hasActivityRecognitionPermission()) {
             sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
         } else {
             null
         }
-
         if (stepSensor != null) {
             isListening = sensorManager.registerListener(
                 listener,
                 stepSensor,
-                SensorManager.SENSOR_DELAY_FASTEST
-            )
-        } else {
-            val accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
-            isListening = sensorManager.registerListener(
-                listener,
-                accelSensor,
-                SensorManager.SENSOR_DELAY_GAME
+                SensorManager.SENSOR_DELAY_FASTEST,
+                0
             )
         }
     }

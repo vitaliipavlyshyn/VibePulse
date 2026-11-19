@@ -39,7 +39,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name="com.vpch.vibepulse.service.WorkoutForegroundService"
+            android:name="com.vpch.vibepulse.service.ActivityForegroundService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback"
             android:stopWithTask="false" />
