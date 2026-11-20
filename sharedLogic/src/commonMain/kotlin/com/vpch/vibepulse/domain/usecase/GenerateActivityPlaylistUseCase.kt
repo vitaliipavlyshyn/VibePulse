@@ -45,7 +45,7 @@ class GenerateActivityPlaylistUseCase(
 
         val clean = collected
             .distinctBy { it.track.spotifyUri }
-            .filter { it.isPlayable && !scoringEngine.isSpam(it) }
+            .filter { it.isPlayable && !scoringEngine.isSpam(it) && !scoringEngine.isRussianTrack(it) }
 
         val popular = clean
             .filter { it.popularity >= 50 }

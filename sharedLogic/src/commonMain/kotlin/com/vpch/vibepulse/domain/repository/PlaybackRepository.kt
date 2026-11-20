@@ -21,4 +21,5 @@ interface PlaybackRepository {
     suspend fun syncState()
     suspend fun enqueueNextIfNeeded(nextTrackProvider: suspend () -> Track?)
     fun resetQueue()
+    fun clearPlaybackState()
 }

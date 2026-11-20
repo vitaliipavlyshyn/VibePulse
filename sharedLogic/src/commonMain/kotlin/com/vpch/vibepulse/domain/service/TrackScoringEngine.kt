@@ -14,6 +14,21 @@ class TrackScoringEngine {
         "ringtone", "white noise", "lullaby", "8d audio"
     )
 
+    private val russianCyrillicRegex = Regex("[ыэъёЫЭЪЁ]")
+    private val russianMarkers = listOf(
+        "русс", "российск", "рф", "москв", "питер", "шансон"
+    )
+
+    fun isRussianTrack(candidate: TrackCandidate): Boolean {
+        val title = candidate.track.title
+        val artist = candidate.track.artist
+        if (russianCyrillicRegex.containsMatchIn(title) || russianCyrillicRegex.containsMatchIn(artist)) {
+            return true
+        }
+        val combinedLower = "${title.lowercase()} ${artist.lowercase()}"
+        return russianMarkers.any { combinedLower.contains(it) }
+    }
+    
     fun selectGenres(
         zone: PaceZone,
         weather: WeatherSnapshot?,

@@ -39,6 +39,7 @@ class ActivityCoordinator(
 
     private var hasDetectedMovement = false
     private var zeroCadenceStreakSeconds = 0
+    private var lastSessionTrackUri: String? = null
 
     private val evaluationIntervalSeconds = 60L
     private val fastReactionWindowSize = 8
@@ -74,13 +75,22 @@ class ActivityCoordinator(
     ) {
         if (playbackRepository.state.value.isPlaying) return
 
-        val initialTracks = generatePlaylist(
+        val previousTrackUri = lastSessionTrackUri
+        lastSessionTrackUri = null
+
+        val generatedTracks = generatePlaylist(
             zone = PaceZone.WALK,
             averageCadence = 110,
             weather = weather,
             preferences = preferences,
-            count = 2
+            count = 3
         )
+
+        val initialTracks = if (previousTrackUri != null) {
+            generatedTracks.filterNot { it.spotifyUri == previousTrackUri }.ifEmpty { generatedTracks }
+        } else {
+            generatedTracks
+        }.take(2)
 
         if (initialTracks.isNotEmpty()) {
             playbackRepository.playBatch(initialTracks).onSuccess {
@@ -122,7 +132,6 @@ class ActivityCoordinator(
             }
         }
 
-        // Якщо на автопаузі — не записуємо нульові семпли і не перемикаємо плейлист
         if (_sessionState.value.isAutoPaused) return
 
         val updatedActivity = currentActivity.addSample(currentCadence)
@@ -260,8 +269,10 @@ class ActivityCoordinator(
 
     fun endSession(): Activity? {
         cadenceMeter.stop()
+        lastSessionTrackUri = playbackRepository.state.value.currentTrack?.spotifyUri
         val finished = _sessionState.value.activity?.finish()
         _sessionState.value = ActivitySessionSnapshot()
+        playbackRepository.clearPlaybackState()
         lastAppliedCadence = 0
         minuteSamples.clear()
         recentSamples.clear()

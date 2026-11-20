@@ -25,7 +25,7 @@ class WeatherRepositoryImpl(
             return Result.success(cached)
         }
 
-        if (!locationProvider.isLocationEnabled() && cached != null) {
+        if (!forceRefresh && !locationProvider.isLocationEnabled() && cached != null) {
             return Result.success(cached)
         }
 
@@ -36,7 +36,11 @@ class WeatherRepositoryImpl(
                     .onSuccess { snapshot -> _currentWeather.value = snapshot }
             },
             onFailure = { error ->
-                if (cached != null) Result.success(cached) else Result.failure(error)
+                if (!forceRefresh && cached != null) {
+                    Result.success(cached)
+                } else {
+                    Result.failure(error)
+                }
             }
         )
     }

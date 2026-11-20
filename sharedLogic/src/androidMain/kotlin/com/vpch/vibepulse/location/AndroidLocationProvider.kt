@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
@@ -11,11 +12,17 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.milliseconds
 
 class AndroidLocationProvider(
     private val context: Context
 ) : LocationProvider {
+
+    private companion object {
+        const val CURRENT_LOCATION_TIMEOUT_MS = 10_000L
+    }
 
     private val fusedClient = LocationServices.getFusedLocationProviderClient(context)
 
@@ -42,7 +49,25 @@ class AndroidLocationProvider(
             return Result.failure(LocationDisabledException())
         }
 
-        return suspendCancellableCoroutine { continuation ->
+        val freshLocation = withTimeoutOrNull(CURRENT_LOCATION_TIMEOUT_MS.milliseconds) {
+            requestFreshLocation()
+        }
+
+        if (freshLocation != null) {
+            return Result.success(Coordinates(freshLocation.latitude, freshLocation.longitude))
+        }
+
+        val fallbackLocation = requestLastLocation()
+        return if (fallbackLocation != null) {
+            Result.success(Coordinates(fallbackLocation.latitude, fallbackLocation.longitude))
+        } else {
+            Result.failure(IllegalStateException("Location timeout or unavailable"))
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun requestFreshLocation(): Location? =
+        suspendCancellableCoroutine { continuation ->
             val cancellationTokenSource = CancellationTokenSource()
 
             continuation.invokeOnCancellation {
@@ -53,30 +78,29 @@ class AndroidLocationProvider(
                 Priority.PRIORITY_BALANCED_POWER_ACCURACY,
                 cancellationTokenSource.token
             ).addOnSuccessListener { location ->
-                if (location != null) {
-                    continuation.resume(
-                        Result.success(Coordinates(location.latitude, location.longitude))
-                    )
-                } else {
-                    fusedClient.lastLocation
-                        .addOnSuccessListener { lastLoc ->
-                            if (lastLoc != null) {
-                                continuation.resume(
-                                    Result.success(Coordinates(lastLoc.latitude, lastLoc.longitude))
-                                )
-                            } else {
-                                continuation.resume(
-                                    Result.failure(IllegalStateException("Location unavailable"))
-                                )
-                            }
-                        }
-                        .addOnFailureListener { e ->
-                            continuation.resume(Result.failure(e))
-                        }
+                if (continuation.isActive) {
+                    continuation.resume(location)
                 }
-            }.addOnFailureListener { exception ->
-                continuation.resume(Result.failure(exception))
+            }.addOnFailureListener {
+                if (continuation.isActive) {
+                    continuation.resume(null)
+                }
             }
         }
-    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun requestLastLocation(): Location? =
+        suspendCancellableCoroutine { continuation ->
+            fusedClient.lastLocation
+                .addOnSuccessListener { lastLoc ->
+                    if (continuation.isActive) {
+                        continuation.resume(lastLoc)
+                    }
+                }
+                .addOnFailureListener {
+                    if (continuation.isActive) {
+                        continuation.resume(null)
+                    }
+                }
+        }
 }

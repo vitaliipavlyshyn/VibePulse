@@ -276,4 +276,18 @@ class PlaybackRepositoryImpl(
             }
         }
     }
+
+    override fun clearPlaybackState() {
+        resetQueue()
+        lastPlayStateCommandMark = null
+        lastSeekCommandMark = null
+        _state.update {
+            it.copy(
+                currentTrack = null,
+                isPlaying = false,
+                positionMs = 0L,
+                durationMs = 0L
+            )
+        }
+    }
 }
