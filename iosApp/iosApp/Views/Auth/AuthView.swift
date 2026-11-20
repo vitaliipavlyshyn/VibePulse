@@ -1,9 +1,4 @@
-//
-//  AuthView.swift
-//  iosApp
-//
-//  Created by Vitalii Pavlyshyn on 12.11.2026.
-//
+
 
 import SwiftUI
 import SharedLogic
@@ -36,7 +31,7 @@ struct AuthView: View {
                     Spacer()
 
                     Text("vibe_pulse")
-                        .font(Font.AppTypography.displayLarge)
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
                         .foregroundStyle(colors.title)
 
                     Spacer()
@@ -52,7 +47,7 @@ struct AuthView: View {
                                 .frame(width: 22, height: 22)
 
                             Text("connect_spotify")
-                                .font(Font.AppTypography.labelLarge.weight(.semibold))
+                                .font(.headline.weight(.semibold))
                         }
                         .foregroundStyle(colors.onButtonFilled)
                         .frame(maxWidth: .infinity)

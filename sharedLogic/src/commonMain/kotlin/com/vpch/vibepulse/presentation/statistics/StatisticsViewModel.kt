@@ -64,7 +64,12 @@ class StatisticsViewModel(
             is StatisticsIntent.OpenActivityDetails -> loadActivityDetails(intent.activityId)
             StatisticsIntent.CloseActivityDetails -> {
                 updateSuccessState {
-                    it.copy(selectedActivityDetails = null, isDetailsLoading = false)
+                    it.copy(
+                        details = ActivityDetailsUiState(
+                            selectedDetails = null,
+                            isLoading = false
+                        )
+                    )
                 }
             }
             is StatisticsIntent.DeleteActivity -> deleteActivity(intent.activityId)
@@ -103,14 +108,17 @@ class StatisticsViewModel(
                                         val currentSuccess = _uiState.value as? StatisticsUiState.Success
                                         StatisticsUiState.Success(
                                             subscriptionState = subState,
-                                            selectedPeriod = period,
-                                            sortOrder = currentSort,
-                                            summary = periodResult.summary,
-                                            activities = sorted.take(limit),
-                                            totalFilteredCount = sorted.size,
-                                            hasMoreActivities = sorted.size > limit,
-                                            selectedActivityDetails = currentSuccess?.selectedActivityDetails,
-                                            isDetailsLoading = currentSuccess?.isDetailsLoading ?: false
+                                            overview = OverviewUiState(
+                                                selectedPeriod = period,
+                                                summary = periodResult.summary
+                                            ),
+                                            history = HistoryUiState(
+                                                sortOrder = currentSort,
+                                                activities = sorted.take(limit),
+                                                totalFilteredCount = sorted.size,
+                                                hasMoreActivities = sorted.size > limit
+                                            ),
+                                            details = currentSuccess?.details ?: ActivityDetailsUiState()
                                         )
                                     }
                                 }
@@ -137,12 +145,16 @@ class StatisticsViewModel(
 
     private fun loadActivityDetails(activityId: Long) {
         viewModelScope.launch {
-            updateSuccessState { it.copy(isDetailsLoading = true) }
-            val details = getActivityDetails(activityId)
+            updateSuccessState {
+                it.copy(details = it.details.copy(isLoading = true))
+            }
+            val loadedDetails = getActivityDetails(activityId)
             updateSuccessState {
                 it.copy(
-                    selectedActivityDetails = details,
-                    isDetailsLoading = false
+                    details = ActivityDetailsUiState(
+                        selectedDetails = loadedDetails,
+                        isLoading = false
+                    )
                 )
             }
         }
@@ -152,8 +164,8 @@ class StatisticsViewModel(
         viewModelScope.launch {
             localActivityRepository.deleteActivity(activityId)
             updateSuccessState { state ->
-                if (state.selectedActivityDetails?.details?.activity?.id == activityId) {
-                    state.copy(selectedActivityDetails = null)
+                if (state.details.selectedDetails?.details?.activity?.id == activityId) {
+                    state.copy(details = state.details.copy(selectedDetails = null))
                 } else {
                     state
                 }

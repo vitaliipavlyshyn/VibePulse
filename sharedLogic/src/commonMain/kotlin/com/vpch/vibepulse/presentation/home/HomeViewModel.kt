@@ -258,13 +258,33 @@ class HomeViewModel(
             updateSuccessState {
                 it.copy(
                     weather = it.weather.copy(
-                        isLoading = currentWeather == null,
+                        isLoading = forceRefresh || currentWeather == null,
                         error = null
                     )
                 )
             }
 
-            weatherRepository.getWeather(forceRefresh = forceRefresh)
+            val result = kotlinx.coroutines.withTimeoutOrNull(14_000L) {
+                weatherRepository.getWeather(forceRefresh = forceRefresh)
+            }
+
+            if (result == null) {
+                val timeoutMsg = HomeMessage.WeatherLoadError
+                updateSuccessState {
+                    it.copy(
+                        weather = it.weather.copy(
+                            isLoading = false,
+                            error = timeoutMsg
+                        )
+                    )
+                }
+                if (forceRefresh || currentWeather == null) {
+                    _effects.send(HomeEffect.ShowMessage(timeoutMsg))
+                }
+                return@launch
+            }
+
+            result
                 .onSuccess { snapshot ->
                     updateSuccessState { state ->
                         state.copy(
@@ -297,7 +317,7 @@ class HomeViewModel(
                         )
                     }
 
-                    if (currentWeather == null && (forceRefresh || isGpsOff)) {
+                    if (forceRefresh || currentWeather == null || isGpsOff) {
                         _effects.send(HomeEffect.ShowMessage(msg))
                         if (forceRefresh && isGpsOff) {
                             _effects.send(HomeEffect.OpenLocationSettings)
@@ -306,7 +326,6 @@ class HomeViewModel(
                 }
         }
     }
-
     private fun startRun() {
         val currentState = _uiState.value as? HomeUiState.Success ?: return
         val user = currentState.user ?: User(
@@ -416,7 +435,7 @@ class HomeViewModel(
         updateSuccessState {
             it.copy(
                 run = RunUiState(),
-                player = it.player.copy(isPlaying = false)
+                player = PlayerUiState()
             )
         }
 
