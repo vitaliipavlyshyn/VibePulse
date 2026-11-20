@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vpch.vibepulse.R
 import com.vpch.vibepulse.domain.model.StatisticsSummary
+import com.vpch.vibepulse.presentation.statistics.HistoryUiState
+import com.vpch.vibepulse.presentation.statistics.OverviewUiState
 import com.vpch.vibepulse.presentation.statistics.StatisticsIntent
 import com.vpch.vibepulse.presentation.statistics.StatisticsMessage
 import com.vpch.vibepulse.presentation.statistics.StatisticsUiState
@@ -114,7 +115,7 @@ fun StatisticsContent(
         is StatisticsUiState.Success -> {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-            uiState.selectedActivityDetails?.let { selectedDetails ->
+            uiState.details.selectedDetails?.let { selectedDetails ->
                 ModalBottomSheet(
                     onDismissRequest = { onIntent(StatisticsIntent.CloseActivityDetails) },
                     sheetState = sheetState,
@@ -174,39 +175,39 @@ fun StatisticsContent(
 
                     item {
                         PeriodSelectorRow(
-                            selectedPeriod = uiState.selectedPeriod,
+                            selectedPeriod = uiState.overview.selectedPeriod,
                             onSelectPeriod = { onIntent(StatisticsIntent.SelectPeriod(it)) }
                         )
                     }
 
-                    item { SummaryKpiGrid(summary = uiState.summary) }
+                    item { SummaryKpiGrid(summary = uiState.overview.summary) }
 
                     item {
                         DailyStepsChartCard(
-                            selectedPeriod = uiState.selectedPeriod,
-                            dailyStats = uiState.summary.dailyStats
+                            selectedPeriod = uiState.overview.selectedPeriod,
+                            dailyStats = uiState.overview.summary.dailyStats
                         )
                     }
 
                     item {
                         HistoryHeaderRow(
-                            totalCount = uiState.totalFilteredCount,
-                            selectedSort = uiState.sortOrder,
+                            totalCount = uiState.history.totalFilteredCount,
+                            selectedSort = uiState.history.sortOrder,
                             onSelectSort = { onIntent(StatisticsIntent.SelectSortOrder(it)) }
                         )
                     }
 
-                    if (uiState.activities.isEmpty()) {
+                    if (uiState.history.activities.isEmpty()) {
                         item { EmptyActivitiesCard() }
                     } else {
-                        items(items = uiState.activities, key = { it.id }) { activity ->
+                        items(items = uiState.history.activities, key = { it.id }) { activity ->
                             ActivityHistoryCard(
                                 activity = activity,
                                 onClick = { onIntent(StatisticsIntent.OpenActivityDetails(activity.id)) }
                             )
                         }
 
-                        if (uiState.hasMoreActivities) {
+                        if (uiState.history.hasMoreActivities) {
                             item {
                                 OutlinedButton(
                                     onClick = { onIntent(StatisticsIntent.LoadMoreActivities) },
@@ -220,7 +221,7 @@ fun StatisticsContent(
                                     BodyText(
                                         text = stringResource(
                                             R.string.stats_load_more,
-                                            uiState.totalFilteredCount - uiState.activities.size
+                                            uiState.history.totalFilteredCount - uiState.history.activities.size
                                         ),
                                         style = AppTheme.typography.labelLarge,
                                         fontWeight = FontWeight.SemiBold,
@@ -267,16 +268,20 @@ private fun StatisticsScreenPreview() = VibePulsePreview(padding = 0.dp) {
     StatisticsContent(
         uiState = StatisticsUiState.Success(
             subscriptionState = SubscriptionState(status = SubscriptionStatus.ACTIVE, isTrial = false),
-            summary = StatisticsSummary(
-                totalSteps = 32400,
-                totalRuns = 4,
-                totalDurationSeconds = 10800L,
-                overallAvgCadence = 168,
-                bestMaxCadence = 182,
-                dailyStats = emptyList()
+            overview = OverviewUiState(
+                summary = StatisticsSummary(
+                    totalSteps = 32400,
+                    totalRuns = 4,
+                    totalDurationSeconds = 10800L,
+                    overallAvgCadence = 168,
+                    bestMaxCadence = 182,
+                    dailyStats = emptyList()
+                )
             ),
-            activities = emptyList(),
-            totalFilteredCount = 0
+            history = HistoryUiState(
+                activities = emptyList(),
+                totalFilteredCount = 0
+            )
         ),
         onIntent = {}
     )

@@ -135,10 +135,6 @@
     <string name="home_msg_track_liked">Added to liked songs</string>
     <string name="home_msg_track_unliked">Removed from liked songs</string>
     <string name="home_error_like_failed">Failed to update liked songs</string>
-    <string name="stats_sort_newest">Newest first</string>
-    <string name="stats_sort_oldest">Oldest first</string>
-    <string name="stats_sort_most_steps">Most steps</string>
-    <string name="stats_sort_highest_cadence">Highest cadence</string>
     <string name="stats_error_load">Failed to load statistics</string>
     <string name="stats_error_user">Failed to identify user</string>
 </resources>

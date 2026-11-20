@@ -135,10 +135,6 @@
     <string name="home_msg_track_liked">Додано в улюблені</string>
     <string name="home_msg_track_unliked">Видалено з улюблених</string>
     <string name="home_error_like_failed">Не вдалося оновити улюблені</string>
-    <string name="stats_sort_newest">Спочатку новіші</string>
-    <string name="stats_sort_oldest">Спочатку старіші</string>
-    <string name="stats_sort_most_steps">Найбільше кроків</string>
-    <string name="stats_sort_highest_cadence">Найвищий каденс</string>
     <string name="stats_error_load">Помилка завантаження статистики</string>
     <string name="stats_error_user">Не вдалося визначити користувача</string>
 </resources>
